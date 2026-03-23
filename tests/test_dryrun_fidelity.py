@@ -9,9 +9,6 @@ Test Coverage:
 """
 
 import os
-from pathlib import Path
-
-import pytest
 
 from onomatool.rename_orchestrator import RenameOrchestrator
 
@@ -140,7 +137,6 @@ class TestDryRunFidelity:
 
     def test_interactive_flow_with_conflict(self, tmp_path, capsys, monkeypatch):
         """Test interactive confirmation flow when conflicts are detected."""
-        import builtins
 
         # Create test file
         test_file = tmp_path / "original.txt"

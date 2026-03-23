@@ -11,8 +11,6 @@ Test Coverage:
 
 import sys
 
-import pytest
-
 from onomatool.cli import main, run_health_check
 
 

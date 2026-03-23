@@ -1,9 +1,10 @@
 """Tests for --format flag override functionality."""
 
 import pytest
+
 from onomatool.file_dispatcher import FileDispatcher
-from onomatool.processors.text_processor import TextProcessor
 from onomatool.processors.markitdown_processor import MarkitdownProcessor
+from onomatool.processors.text_processor import TextProcessor
 
 
 class TestFormatOverride:

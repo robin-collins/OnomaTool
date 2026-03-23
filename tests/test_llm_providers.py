@@ -163,11 +163,11 @@ class TestGoogleProvider:
         assert isinstance(provider, GoogleProvider)
 
     def test_google_provider_supports_images(self):
-        """TC-LP-004: Test GoogleProvider.supports_images() returns False."""
+        """TC-LP-004: Test GoogleProvider.supports_images() returns True."""
         config = {"google_api_key": "test-key"}
         provider = GoogleProvider(config)
 
-        assert provider.supports_images() is False
+        assert provider.supports_images() is True
 
 
 class TestGetProvider:

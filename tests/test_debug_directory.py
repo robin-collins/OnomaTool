@@ -1,8 +1,6 @@
 """Tests for centralized debug directory functionality."""
 
 import os
-import shutil
-import tempfile
 from datetime import datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
@@ -12,7 +10,6 @@ import pytest
 from onomatool.rename_orchestrator import (
     RenameOrchestrator,
     _cleanup_old_debug_sessions,
-    DEBUG_RETENTION_DAYS,
 )
 
 

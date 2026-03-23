@@ -20,7 +20,7 @@ The tests verify that:
 import logging
 import pathlib
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -101,6 +101,7 @@ def test_api_keys_not_in_log_output(temp_copy, caplog):
     """TC-LOG-005: Set verbose, configure with a dummy API key, verify key doesn't appear in logs."""
     # Create a config with a fake API key
     import tempfile
+
     import tomli_w
 
     config_data = {

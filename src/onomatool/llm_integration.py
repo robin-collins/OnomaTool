@@ -236,8 +236,10 @@ class GoogleProvider:
             logger.debug("Using Google Gemini")
             logger.debug("Model: %s", model)
 
-        # Extract user prompt from messages
+        # Extract user prompt and image data from messages
         user_prompt = ""
+        image_parts: list[types.Part] = []
+
         for msg in messages:
             if msg.get("role") == "user":
                 content = msg.get("content", "")
@@ -245,9 +247,23 @@ class GoogleProvider:
                     user_prompt = content
                 elif isinstance(content, list):
                     for item in content:
-                        if isinstance(item, dict) and item.get("type") == "text":
-                            user_prompt = item.get("text", "")
-                            break
+                        if isinstance(item, dict):
+                            if item.get("type") == "text":
+                                user_prompt = item.get("text", "")
+                            elif item.get("type") == "image_url":
+                                image_url_data = item.get("image_url", {})
+                                url = image_url_data.get("url", "") if isinstance(image_url_data, dict) else image_url_data
+                                if url.startswith("data:"):
+                                    # Parse data URI: data:<mime>;base64,<data>
+                                    header, b64_data = url.split(",", 1)
+                                    mime_type = header.split(":")[1].split(";")[0]
+                                    image_bytes = base64.b64decode(b64_data)
+                                    image_parts.append(
+                                        types.Part.from_bytes(
+                                            data=image_bytes,
+                                            mime_type=mime_type,
+                                        )
+                                    )
                 break
 
         if verbose_level > 1:
@@ -255,10 +271,20 @@ class GoogleProvider:
             total_tokens = count_text_tokens(user_prompt, "gpt-4o")
             logger.debug("Total characters in request: %s", total_chars)
             logger.debug("Estimated tokens: %s", total_tokens)
+            if image_parts:
+                logger.debug("Image parts: %d", len(image_parts))
+
+        # Build contents: text + images
+        contents: list = []
+        if image_parts:
+            contents.append(user_prompt)
+            contents.extend(image_parts)
+        else:
+            contents = user_prompt
 
         response = client.models.generate_content(
             model=model,
-            contents=user_prompt,
+            contents=contents,
             config=types.GenerateContentConfig(
                 max_output_tokens=MAX_TOKENS,
             ),
@@ -277,7 +303,7 @@ class GoogleProvider:
         return suggestions[:3]
 
     def supports_images(self) -> bool:
-        return False
+        return True
 
 
 # --- Provider factory ---
@@ -319,7 +345,7 @@ def _is_transient_error(err: Exception) -> bool:
     """Return True if the error is transient and worth retrying."""
     # OpenAI SDK exceptions
     try:
-        from openai import APIStatusError, APITimeoutError, APIConnectionError
+        from openai import APIConnectionError, APIStatusError, APITimeoutError
 
         if isinstance(err, (APITimeoutError, APIConnectionError)):
             return True

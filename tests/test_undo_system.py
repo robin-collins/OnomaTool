@@ -3,11 +3,9 @@
 import os
 import sqlite3
 from datetime import datetime, timedelta
-from pathlib import Path
 
 import pytest
 
-from onomatool.cli import main
 from onomatool.history import RenameHistory
 
 
@@ -154,8 +152,8 @@ def test_history_lists_sessions(temp_db, capsys):
     history.close()
 
     # Test via CLI
-    from onomatool.cli import _handle_history
     import onomatool.history
+    from onomatool.cli import _handle_history
 
     # Monkey-patch DEFAULT_DB_PATH
     original_path = onomatool.history.DEFAULT_DB_PATH

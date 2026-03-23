@@ -1,5 +1,5 @@
 import time
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 import pytest
 
@@ -10,7 +10,6 @@ from onomatool.llm_integration import (
     _is_transient_error,
     get_suggestions,
 )
-
 
 # --- Mock Providers for Testing ---
 

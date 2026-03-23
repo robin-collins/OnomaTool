@@ -1,14 +1,13 @@
 """Tests for progress bar display and batch error handling."""
 
-import os
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import pytest
 
-from onomatool.rename_orchestrator import RenameOrchestrator
 from onomatool.config import get_config
-from onomatool.suggestion_strategy import TextOnlyStrategy, MultiPassStrategy
+from onomatool.rename_orchestrator import RenameOrchestrator
+from onomatool.suggestion_strategy import TextOnlyStrategy
 
 MOCK_CONFIG = str(Path(__file__).resolve().parent / "mock_config.toml")
 

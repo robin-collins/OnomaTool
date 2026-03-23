@@ -12,11 +12,11 @@ from tqdm import tqdm
 from onomatool.conflict_resolver import resolve_conflict
 from onomatool.file_collector import collect_files
 from onomatool.file_dispatcher import FileDispatcher
+from onomatool.history import RenameHistory
 from onomatool.models import ProcessingResult
 from onomatool.renamer import rename_file
 from onomatool.sanitizer import sanitize_filename
 from onomatool.suggestion_strategy import select_strategy
-from onomatool.history import RenameHistory
 from onomatool.utils.image_utils import convert_svg_to_png
 
 logger = logging.getLogger(__name__)
