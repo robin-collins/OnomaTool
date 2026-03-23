@@ -1,3 +1,5 @@
+"""Text file processor with encoding detection and UTF-8 normalization."""
+
 import atexit
 import logging
 import os

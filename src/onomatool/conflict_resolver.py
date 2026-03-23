@@ -1,3 +1,5 @@
+"""Filename conflict resolution with numeric suffix appending."""
+
 import os
 
 from onomatool.exceptions import OnomaConflictError

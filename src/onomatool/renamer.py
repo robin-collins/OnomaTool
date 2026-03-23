@@ -1,3 +1,5 @@
+"""File renaming with conflict resolution and extension preservation."""
+
 import os
 import shutil
 

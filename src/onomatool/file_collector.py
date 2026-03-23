@@ -1,3 +1,5 @@
+"""File collection via glob pattern matching."""
+
 import glob
 import logging
 import os

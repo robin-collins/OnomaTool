@@ -20,17 +20,6 @@ try:
     import fitz  # PyMuPDF
 except ImportError:
     fitz = None
-try:
-    from PIL import Image, ImageDraw
-    from pptx import Presentation
-except ImportError:
-    Presentation = None
-    Image = None
-    ImageDraw = None
-try:
-    import cairosvg
-except ImportError:
-    cairosvg = None
 
 
 def _make_tempdir(prefix: str, debug: bool):

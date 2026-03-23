@@ -1,3 +1,5 @@
+"""File dispatcher that routes files to appropriate processors based on type."""
+
 import logging
 
 from .constants import TEXT_EXTENSIONS

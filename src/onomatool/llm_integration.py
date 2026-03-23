@@ -1,3 +1,5 @@
+"""LLM integration for generating filename suggestions via OpenAI and Google Gemini."""
+
 import base64
 import functools
 import json
@@ -30,9 +32,6 @@ _rate_limit_lock = threading.Lock()
 
 # Maximum characters to send to LLM (approx 65,535 tokens)
 MAX_CONTENT_CHARS = 120_000
-
-# Maximum consecutive digits allowed in a single word
-MAX_CONSECUTIVE_DIGITS = 10
 
 
 class LLMProvider(Protocol):
@@ -89,6 +88,7 @@ class OpenAIProvider:
         self.config = config
 
     def _create_client(self):
+        """Create an OpenAI or Azure OpenAI client based on config."""
         import httpx
         from openai import OpenAI
 
@@ -435,6 +435,7 @@ def _call_provider_with_retry(
 
 
 def get_pydantic_model_and_schema(naming_convention: str) -> tuple:
+    """Return (pydantic_model_class, json_schema) for the given naming convention."""
     try:
         model_class = get_model_for_naming_convention(naming_convention)
         json_schema = generate_json_schema_from_model(model_class)

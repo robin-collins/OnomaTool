@@ -1,9 +1,9 @@
+"""Command-line interface for OnomaTool AI-powered file renaming."""
+
 import argparse
 import logging
 import os
 import sys
-
-import tomli_w
 
 from onomatool import __version__
 from onomatool.config import DEFAULT_CONFIG, get_config
@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 def main(args=None):
+    """Entry point for the onomatool CLI. Returns exit code (0=success)."""
     try:
         if args is None:
             args = sys.argv[1:]
@@ -326,6 +327,7 @@ def _handle_select_model(args) -> int:
     # Save to config file
     try:
         import tomli
+        import tomli_w
 
         existing = {}
         config_path = os.path.expanduser(config_path)
@@ -512,6 +514,8 @@ def save_default_config():
     config["min_filename_words"] = config.get("min_filename_words", 5)
     config["max_filename_words"] = config.get("max_filename_words", 15)
     try:
+        import tomli_w
+
         with open(config_path, "wb") as f:
             tomli_w.dump(config, f)
     except Exception as e:
