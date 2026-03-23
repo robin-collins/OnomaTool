@@ -43,6 +43,8 @@ class OnomatoolConfig(BaseModel):
     system_prompt: str = ""
     user_prompt: str = ""
     image_prompt: str = ""
+    max_retries: int = Field(default=0, ge=0, le=10)
+    retry_delay: float = Field(default=1.0, ge=0.0, le=60.0)
     markitdown: MarkitdownConfig = MarkitdownConfig()
 
     @field_validator("max_filename_words")

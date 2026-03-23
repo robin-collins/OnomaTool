@@ -22,18 +22,28 @@ class RenameOrchestrator:
         dry_run: bool = False,
         debug: bool = False,
         verbose_level: int = 0,
+        exclude_patterns: list[str] | None = None,
     ):
         self.config = config
         self.dry_run = dry_run
         self.debug = debug
         self.verbose_level = verbose_level
+        self.exclude_patterns = exclude_patterns or []
         self.dispatcher = FileDispatcher(config, debug=debug)
         self.planned_renames: list[tuple[str, str]] = []
         self._debug_tempdirs: list = []
 
     def process_files(self, pattern: str) -> None:
         """Process all files matching the glob pattern."""
+        import fnmatch
+
         files = collect_files(pattern)
+        if self.exclude_patterns:
+            files = [
+                f
+                for f in files
+                if not any(fnmatch.fnmatch(f, ep) for ep in self.exclude_patterns)
+            ]
         for file_path in files:
             print(f"Processing file: {file_path}")
             self._process_single_file(file_path)

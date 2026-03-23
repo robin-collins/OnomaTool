@@ -1,11 +1,15 @@
 import base64
 import json
+import logging
 import mimetypes
 import os
 import re
+import time
 from typing import Protocol
 
 import tiktoken
+
+logger = logging.getLogger(__name__)
 
 from onomatool.config import get_config
 from onomatool.models import (
@@ -291,6 +295,67 @@ def get_provider(config: dict) -> LLMProvider:
         raise RuntimeError(f"Unsupported provider: {provider_name}")
 
 
+# --- Retry logic ---
+
+
+def _is_transient_error(err: Exception) -> bool:
+    """Return True if the error is transient and worth retrying."""
+    # OpenAI SDK exceptions
+    try:
+        from openai import APIStatusError, APITimeoutError, APIConnectionError
+
+        if isinstance(err, (APITimeoutError, APIConnectionError)):
+            return True
+        if isinstance(err, APIStatusError):
+            return err.status_code >= 500 or err.status_code == 429
+    except ImportError:
+        pass
+
+    # Google SDK exceptions
+    err_str = str(err).lower()
+    for keyword in ("timeout", "rate limit", "429", "500", "502", "503", "504"):
+        if keyword in err_str:
+            return True
+
+    return False
+
+
+def _call_provider_with_retry(
+    provider: LLMProvider,
+    messages: list[dict],
+    pydantic_model: type,
+    json_schema: dict,
+    model: str,
+    verbose_level: int,
+    max_retries: int,
+    retry_delay: float,
+) -> list[str]:
+    """Call provider.get_suggestions with exponential backoff on transient errors."""
+    last_error: Exception | None = None
+
+    for attempt in range(max_retries + 1):
+        try:
+            return provider.get_suggestions(
+                messages, pydantic_model, json_schema, model, verbose_level
+            )
+        except Exception as err:
+            last_error = err
+            if not _is_transient_error(err) or attempt >= max_retries:
+                raise
+            delay = retry_delay * (2 ** attempt)
+            logger.warning(
+                "LLM call failed (attempt %d/%d): %s — retrying in %.1fs",
+                attempt + 1,
+                max_retries + 1,
+                err,
+                delay,
+            )
+            time.sleep(delay)
+
+    # Should not reach here, but just in case
+    raise last_error  # type: ignore[misc]
+
+
 # --- Utility functions ---
 
 
@@ -391,11 +456,14 @@ def get_suggestions(
             {"role": "user", "content": user_prompt},
         ]
 
-    # Get provider and call
+    # Get provider and call with retry
     provider = get_provider(config)
+    max_retries = config.get("max_retries", 0)
+    retry_delay = config.get("retry_delay", 1.0)
     try:
-        return provider.get_suggestions(
-            messages, pydantic_model, json_schema, model, verbose_level
+        return _call_provider_with_retry(
+            provider, messages, pydantic_model, json_schema, model,
+            verbose_level, max_retries, retry_delay,
         )
     except Exception as err:
         provider_name = config.get("default_provider", "openai")

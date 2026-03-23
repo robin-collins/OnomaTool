@@ -77,11 +77,49 @@ def main(args=None):
             "--config",
             help="Specify a configuration file to use",
         )
+        parser.add_argument(
+            "--check",
+            action="store_true",
+            help="Check system dependency health and exit",
+        )
+        parser.add_argument(
+            "--exclude",
+            action="append",
+            default=[],
+            metavar="PATTERN",
+            help="Glob patterns to exclude from processing (can be repeated)",
+        )
+        parser.add_argument(
+            "--sort",
+            choices=["name", "size", "modified"],
+            help="Sort order for file processing (not yet implemented)",
+        )
+        parser.add_argument(
+            "--undo",
+            action="store_true",
+            help="Undo last rename operation (not yet implemented)",
+        )
+        parser.add_argument(
+            "--history",
+            action="store_true",
+            help="Show rename history (not yet implemented)",
+        )
         args = parser.parse_args(args)
+
+        if args.check:
+            return run_health_check()
 
         if args.save_config:
             save_default_config()
             print("Default configuration saved to ~/.onomarc")
+            return 0
+
+        if args.undo:
+            print("Warning: --undo is not yet implemented.")
+            return 0
+
+        if args.history:
+            print("Warning: --history is not yet implemented.")
             return 0
 
         if not args.pattern:
@@ -93,6 +131,11 @@ def main(args=None):
         if args.format:
             print(
                 "Warning: --format is not yet implemented and will be ignored."
+            )
+
+        if args.sort:
+            print(
+                "Warning: --sort is not yet implemented and will be ignored."
             )
 
         # Handle verbosity levels
@@ -109,6 +152,7 @@ def main(args=None):
             dry_run=args.dry_run,
             debug=args.debug,
             verbose_level=verbose_level,
+            exclude_patterns=args.exclude,
         )
 
         orchestrator.process_files(args.pattern)
@@ -128,6 +172,70 @@ def main(args=None):
         print(f"An error occurred: {e}")
         return 1
     return 0
+
+
+def run_health_check() -> int:
+    """Check system dependencies and print status."""
+    import shutil
+    import subprocess
+
+    checks = []
+
+    # Python version
+    checks.append(("Python", sys.version.split()[0], True))
+
+    # Core Python packages
+    for pkg_name, import_name in [
+        ("markitdown", "markitdown"),
+        ("openai", "openai"),
+        ("google-genai", "google.genai"),
+        ("tomli", "tomli"),
+        ("pydantic", "pydantic"),
+        ("tiktoken", "tiktoken"),
+        ("chardet", "chardet"),
+        ("cairosvg", "cairosvg"),
+        ("Pillow", "PIL"),
+        ("PyMuPDF", "fitz"),
+    ]:
+        try:
+            mod = __import__(import_name.split(".")[0])
+            version = getattr(mod, "__version__", "installed")
+            checks.append((pkg_name, version, True))
+        except ImportError:
+            checks.append((pkg_name, "MISSING", False))
+
+    # System tools
+    for tool in ["soffice", "convert"]:
+        path = shutil.which(tool)
+        if path:
+            try:
+                result = subprocess.run(
+                    [tool, "--version"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                )
+                version = result.stdout.split("\n")[0][:50] if result.stdout else "found"
+            except Exception:
+                version = "found"
+            checks.append((tool, version, True))
+        else:
+            checks.append((tool, "MISSING", False))
+
+    # Print results
+    all_ok = True
+    for name, version, ok in checks:
+        status = "OK" if ok else "MISSING"
+        print(f"  {name:20s} {version:30s} [{status}]")
+        if not ok:
+            all_ok = False
+
+    if all_ok:
+        print("\nAll dependencies OK.")
+    else:
+        print("\nSome dependencies are missing. Install them for full functionality.")
+
+    return 0 if all_ok else 1
 
 
 def save_default_config():
