@@ -54,6 +54,7 @@ class OnomatoolConfig(BaseModel):
     retry_delay: float = Field(default=1.0, ge=0.0, le=60.0)
     rate_limit_delay: float = Field(default=0.0, ge=0.0, le=60.0)
     history_retention_days: int = Field(default=90, ge=1, le=3650)
+    concurrency: int = Field(default=1, ge=1, le=32)
     extra_processors: list[str] = Field(default_factory=list)
     markitdown: MarkitdownConfig = MarkitdownConfig()
 
@@ -122,5 +123,7 @@ def _migrate_config(raw: dict) -> dict:
     #     version = 2
 
     raw["config_version"] = CURRENT_CONFIG_VERSION
-    logger.info("Migrated config from version %d to %d", version, CURRENT_CONFIG_VERSION)
+    logger.info(
+        "Migrated config from version %d to %d", version, CURRENT_CONFIG_VERSION
+    )
     return raw

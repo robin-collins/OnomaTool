@@ -5,6 +5,8 @@ import os
 import shutil
 import sys
 import tempfile
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 
 from tqdm import tqdm
@@ -25,7 +27,9 @@ DEBUG_DIR = os.path.expanduser("~/.onoma_debug")
 DEBUG_RETENTION_DAYS = 7
 
 
-def _cleanup_old_debug_sessions(base_dir: str, retention_days: int = DEBUG_RETENTION_DAYS) -> None:
+def _cleanup_old_debug_sessions(
+    base_dir: str, retention_days: int = DEBUG_RETENTION_DAYS
+) -> None:
     """Remove debug session directories older than retention_days."""
     if not os.path.isdir(base_dir):
         return
@@ -65,9 +69,11 @@ class RenameOrchestrator:
         self.dispatcher = FileDispatcher(config, debug=debug)
         self.planned_renames: list[tuple[str, str]] = []
         self._debug_tempdirs: list = []
+        self.concurrency = config.get("concurrency", 1)
         self.renamed_count = 0
         self.failed_count = 0
         self.skipped_count = 0
+        self._lock = threading.Lock()
         self.history = history
         self._session_id: int | None = None
         self._debug_session_dir: str | None = None
@@ -117,18 +123,24 @@ class RenameOrchestrator:
             self._session_id = self.history.create_session(os.getcwd())
 
         use_progress = sys.stderr.isatty() and len(files) > 1
-        iterator = tqdm(
-            files,
+        pbar = tqdm(
+            total=len(files),
             desc="Processing",
             unit="file",
             disable=not use_progress,
             file=sys.stderr,
         )
 
-        for file_path in iterator:
-            if use_progress:
-                iterator.set_postfix_str(os.path.basename(file_path), refresh=True)
-            self._process_single_file(file_path)
+        if self.concurrency > 1 and len(files) > 1:
+            self._process_files_parallel(files, pbar, use_progress)
+        else:
+            for file_path in files:
+                if use_progress:
+                    pbar.set_postfix_str(os.path.basename(file_path), refresh=True)
+                self._process_single_file(file_path)
+                pbar.update(1)
+
+        pbar.close()
 
         if len(files) > 0:
             action = "planned" if self.dry_run else "renamed"
@@ -138,6 +150,28 @@ class RenameOrchestrator:
                 f"{self.failed_count} failed, "
                 f"{self.skipped_count} skipped"
             )
+
+    def _process_files_parallel(
+        self, files: list[str], pbar, use_progress: bool
+    ) -> None:
+        """Process files using a thread pool for concurrent LLM calls."""
+        max_workers = min(self.concurrency, len(files))
+        logger.debug("Processing %d files with concurrency=%d", len(files), max_workers)
+
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {
+                executor.submit(self._process_single_file, fp): fp for fp in files
+            }
+            for future in as_completed(futures):
+                file_path = futures[future]
+                if use_progress:
+                    pbar.set_postfix_str(os.path.basename(file_path), refresh=True)
+                pbar.update(1)
+                # Propagate any unexpected exceptions
+                try:
+                    future.result()
+                except Exception as e:
+                    logger.error("Unexpected error processing %s: %s", file_path, e)
 
     def _process_single_file(self, file_path: str) -> None:
         """Process a single file through the full pipeline."""
@@ -150,14 +184,16 @@ class RenameOrchestrator:
         if is_svg:
             svg_tempdir, png_path = self._convert_svg(file_path)
             if png_path is None:
-                self.failed_count += 1
+                with self._lock:
+                    self.failed_count += 1
                 return
 
         # Process file content
         result = self.dispatcher.process(file_path, self.format_override)
         if result is None:
             self._cleanup_tempdir(svg_tempdir)
-            self.skipped_count += 1
+            with self._lock:
+                self.skipped_count += 1
             return
 
         try:
@@ -180,12 +216,15 @@ class RenameOrchestrator:
             # Execute rename
             if suggestions:
                 self._execute_rename(file_path, suggestions[0])
-                self.renamed_count += 1
+                with self._lock:
+                    self.renamed_count += 1
             else:
-                self.skipped_count += 1
+                with self._lock:
+                    self.skipped_count += 1
         except Exception as e:
             logger.error("Failed to process %s: %s", file_path, e)
-            self.failed_count += 1
+            with self._lock:
+                self.failed_count += 1
             if self.history and self._session_id is not None:
                 self.history.record_rename(
                     self._session_id, file_path, file_path, status="error"
@@ -225,20 +264,20 @@ class RenameOrchestrator:
         _, ext = os.path.splitext(file_path)
         base_new_name, _ = os.path.splitext(new_name)
         new_name_with_ext = base_new_name + ext
-        existing_files = os.listdir(directory)
-        final_name = resolve_conflict(new_name_with_ext, existing_files)
 
-        if self.dry_run:
-            print(f"{os.path.basename(file_path)} --dry-run-> {final_name}")
-            self.planned_renames.append((file_path, new_name))
-        else:
-            new_path = os.path.join(directory, final_name)
-            print(f"{os.path.basename(file_path)} --> {final_name}")
-            rename_file(file_path, new_name)
-            if self.history and self._session_id is not None:
-                self.history.record_rename(
-                    self._session_id, file_path, new_path
-                )
+        with self._lock:
+            existing_files = os.listdir(directory)
+            final_name = resolve_conflict(new_name_with_ext, existing_files)
+
+            if self.dry_run:
+                print(f"{os.path.basename(file_path)} --dry-run-> {final_name}")
+                self.planned_renames.append((file_path, new_name))
+            else:
+                new_path = os.path.join(directory, final_name)
+                print(f"{os.path.basename(file_path)} --> {final_name}")
+                rename_file(file_path, new_name)
+                if self.history and self._session_id is not None:
+                    self.history.record_rename(self._session_id, file_path, new_path)
 
     def check_planned_renames(self) -> list[tuple[str, str, str]]:
         """Re-resolve planned renames against current state.
@@ -277,22 +316,20 @@ class RenameOrchestrator:
             print(f"{os.path.basename(file_path)} --> {final_name}")
             rename_file(file_path, new_name)
             if self.history and self._session_id is not None:
-                self.history.record_rename(
-                    self._session_id, file_path, new_path
-                )
+                self.history.record_rename(self._session_id, file_path, new_path)
 
     def _log_debug_info(self, result: ProcessingResult) -> None:
         """Log debug info for result tempdirs."""
         if result.tempdir is not None and self.debug:
             self._debug_tempdirs.append(result.tempdir)
             logger.debug(
-                "Created tempdir for %s: %s", result.file_type.upper(), result.tempdir.name
+                "Created tempdir for %s: %s",
+                result.file_type.upper(),
+                result.tempdir.name,
             )
             for img_path in result.images:
                 logger.debug("Created image: %s", img_path)
-            markdown_path = os.path.join(
-                result.tempdir.name, "extracted_content.md"
-            )
+            markdown_path = os.path.join(result.tempdir.name, "extracted_content.md")
             if os.path.exists(markdown_path):
                 logger.debug("Created markdown: %s", markdown_path)
 
@@ -311,7 +348,9 @@ class RenameOrchestrator:
             return
         if self.debug:
             logger.debug(
-                "Preserving %s tempdir: %s", result.file_type.upper(), result.tempdir.name
+                "Preserving %s tempdir: %s",
+                result.file_type.upper(),
+                result.tempdir.name,
             )
         else:
             result.tempdir.cleanup()
