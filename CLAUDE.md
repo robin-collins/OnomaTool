@@ -104,4 +104,9 @@ The project has comprehensive tests covering:
 - Modular architecture allows easy extension of file processors
 - Comprehensive error handling with graceful failures
 - Supports both local and cloud LLM endpoints
+
+### Large File Writes
+- When creating or rewriting files longer than ~200 lines, split into multiple sequential Write or Edit calls (each chunk ≤ 200 lines) to avoid hitting API output-token limits.
+- First Write creates the file with the initial chunk; subsequent Edit calls append by matching the last line of the previous chunk.
+- Never attempt to write an entire large document (500+ lines) in a single tool call.
 Use 'bd' for task tracking
