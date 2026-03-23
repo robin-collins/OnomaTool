@@ -7,6 +7,11 @@ import tomli_w
 
 from onomatool.config import DEFAULT_CONFIG, get_config
 from onomatool.history import RenameHistory
+from onomatool.model_discovery import (
+    format_model_list,
+    list_models,
+    select_model_interactive,
+)
 from onomatool.rename_orchestrator import RenameOrchestrator
 
 logger = logging.getLogger(__name__)
@@ -111,6 +116,16 @@ def main(args=None):
             action="store_true",
             help="Show recent rename sessions",
         )
+        parser.add_argument(
+            "--list-models",
+            action="store_true",
+            help="List available models from the configured AI provider and exit",
+        )
+        parser.add_argument(
+            "--select-model",
+            action="store_true",
+            help="Interactively select a model from the provider and save to config",
+        )
         args = parser.parse_args(args)
 
         if args.check:
@@ -126,6 +141,12 @@ def main(args=None):
 
         if args.history:
             return _handle_history()
+
+        if args.list_models:
+            return _handle_list_models(args)
+
+        if args.select_model:
+            return _handle_select_model(args)
 
         if not args.pattern:
             parser.error("the following arguments are required: pattern")
@@ -239,6 +260,69 @@ def _handle_history() -> int:
         print(
             f"{s['id']:>6}  {s['timestamp']:25s}  {s['file_count']:>5}  {s['working_dir']}"
         )
+    return 0
+
+
+def _handle_list_models(args) -> int:
+    """Handle --list-models command."""
+    config = get_config(args.config)
+    verbose = args.verbose or args.very_verbose
+
+    if verbose:
+        logging.basicConfig(
+            level=logging.DEBUG,
+            format="[%(levelname)s] %(message)s",
+            stream=sys.stdout,
+        )
+
+    try:
+        models = list_models(config)
+        print(format_model_list(models, verbose=verbose))
+    except RuntimeError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+    return 0
+
+
+def _handle_select_model(args) -> int:
+    """Handle --select-model command: interactive picker that saves to config."""
+    config = get_config(args.config)
+    config_path = args.config or os.path.expanduser("~/.onomarc")
+
+    try:
+        models = list_models(config)
+    except RuntimeError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+    selected = select_model_interactive(models)
+    if selected is None:
+        print("No model selected.")
+        return 0
+
+    # Update config with the selected model
+    config["llm_model"] = selected.id
+    print(f"\nSelected: {selected.id}")
+
+    # Save to config file
+    try:
+        import tomli
+
+        existing = {}
+        config_path = os.path.expanduser(config_path)
+        if os.path.exists(config_path):
+            with open(config_path, "rb") as f:
+                existing = tomli.load(f)
+
+        existing["llm_model"] = selected.id
+        with open(config_path, "wb") as f:
+            tomli_w.dump(existing, f)
+        print(f'Saved llm_model = "{selected.id}" to {config_path}')
+    except Exception as e:
+        print(f"Warning: Could not save config: {e}", file=sys.stderr)
+        print(f'Manually set llm_model = "{selected.id}" in {config_path}')
+        return 1
+
     return 0
 
 
