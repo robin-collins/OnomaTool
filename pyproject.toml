@@ -46,14 +46,14 @@ dependencies = [
     "cairosvg>=2.8.2",
     "pillow>=11.2.1",
     "PyMuPDF>=1.26.1",
-    "ruff>=0.12.0",
+    "toml>=0.10.2",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8.4.0",
     "pytest-cov>=4.0.0",
-    "ruff>=0.11.13",
+    "ruff>=0.12.0",
 ]
 
 [project.urls]
@@ -96,7 +96,9 @@ quote-style = "double"
 indent-style = "space"
 line-ending = "lf"
 
-[tool.uv.workspace]
-members = [
-    "temp_init",
+[dependency-groups]
+dev = [
+    "pytest>=8.4.0",
+    "pytest-cov>=4.0.0",
+    "ruff>=0.12.0",
 ]

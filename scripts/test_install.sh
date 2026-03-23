@@ -1,60 +1,40 @@
 #!/bin/bash
 set -e
 
-echo "🧪 Testing Onomatool installation..."
+echo "Testing Onomatool installation..."
 
-# Activate project virtual environment
-echo "🐍 Activating project virtual environment..."
-if [ ! -d ".venv" ]; then
-    echo "❌ Error: .venv directory not found. Please create the virtual environment first:"
-    echo "   python -m venv .venv"
-    echo "   source .venv/bin/activate"
-    echo "   uv pip install -r requirements.txt"
+# Ensure uv is available
+if ! command -v uv &> /dev/null; then
+    echo "Error: uv is required. Install it: curl -LsSf https://astral.sh/uv/install.sh | sh"
     exit 1
 fi
-source .venv/bin/activate
 
-# Create a temporary virtual environment for isolated testing
-TEMP_VENV=$(mktemp -d)/test_venv
-echo "📁 Creating temporary test venv: $TEMP_VENV"
-python -m venv "$TEMP_VENV"
-source "$TEMP_VENV/bin/activate"
+# Build the package first if dist/ doesn't exist
+if [ ! -d "dist" ] || [ -z "$(ls dist/*.whl 2>/dev/null)" ]; then
+    echo "Building package first..."
+    uv build
+fi
 
-# Install uv in the test environment
-echo "📦 Installing uv in test environment..."
-pip install uv
-
-# Install the built package
-echo "📦 Installing from dist/..."
-uv pip install dist/*.whl
-
-# Test the CLI command is available
-echo "🔍 Testing CLI availability..."
-which onomatool
-onomatool --help
+# Test the CLI command via uvx with the built wheel
+echo "Testing CLI via uvx with built wheel..."
+WHL=$(ls dist/*.whl | head -1)
+uvx --from "$WHL" onomatool --help
 
 # Test basic functionality with mock provider
-echo "🎯 Testing basic functionality..."
-mkdir -p /tmp/onomatool_test
-cd /tmp/onomatool_test
-echo "This is a test file for onomatool" > test_file.txt
+echo "Testing basic functionality..."
+TEMP_DIR=$(mktemp -d)
+echo "This is a test file for onomatool" > "$TEMP_DIR/test_file.txt"
 
-# Create a test config with mock provider
-cat > test_config.toml << EOF
+cat > "$TEMP_DIR/test_config.toml" << EOF
 default_provider = "mock"
 naming_convention = "snake_case"
 EOF
 
 # Test dry run
-onomatool --config test_config.toml --dry-run "*.txt"
+uvx --from "$WHL" onomatool --config "$TEMP_DIR/test_config.toml" --dry-run "$TEMP_DIR/*.txt"
 
 # Cleanup
-echo "🧹 Cleaning up..."
-rm -rf /tmp/onomatool_test
-deactivate  # Deactivate test venv
-rm -rf "$TEMP_VENV"
+echo "Cleaning up..."
+rm -rf "$TEMP_DIR"
 
-# Reactivate project venv
-source .venv/bin/activate
-
-echo "✅ Installation test passed!"
+echo "Installation test passed!"

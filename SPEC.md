@@ -8,7 +8,7 @@
 | **Version** | 0.1.0 |
 | **License** | MIT |
 | **Language** | Python 3.10+ |
-| **Package Manager** | uv |
+| **Package Manager** | uv (run via `uvx onomatool` or `uv run onomatool`) |
 | **Build System** | setuptools (via `pyproject.toml`) |
 | **Entry Point** | `onomatool.cli:console_script` |
 | **Repository** | https://github.com/robin-collins/Onoma |
@@ -394,7 +394,7 @@ Three prompt templates are used, all overridable via config:
 | `pillow` | 11.2.1 | Image processing and resizing |
 | `PyMuPDF` | 1.26.1 | PDF page-to-image extraction |
 | `tomli` | 2.2.1 | TOML parsing |
-| `ruff` | 0.12.0 | Linting and formatting |
+| `toml` | 0.10.2 | TOML writing (config save) |
 
 ### 9.2 System Dependencies
 
@@ -404,13 +404,13 @@ Three prompt templates are used, all overridable via config:
 | ImageMagick (`convert`) | PDF to JPEG conversion | PPTX slide image generation |
 | Cairo libraries | SVG rendering backend | SVG processing |
 
-### 9.3 Development Dependencies
+### 9.3 Development Dependencies (installed via `uv sync --all-extras`)
 
 | Package | Purpose |
 |---------|---------|
 | `pytest` >= 8.4.0 | Test runner |
 | `pytest-cov` >= 4.0.0 | Coverage reporting |
-| `ruff` >= 0.11.13 | Linting and formatting |
+| `ruff` >= 0.12.0 | Linting and formatting |
 
 ---
 
@@ -445,6 +445,20 @@ uv run pytest tests/test_utf8_encoding.py  # Encoding tests
 uv run pytest --cov=onomatool              # With coverage
 ```
 
+### 10.4 Running the Tool
+
+```bash
+# Direct execution without install (resolves deps automatically)
+uvx onomatool '*.pdf'
+
+# From development checkout
+uv run onomatool '*.pdf'
+
+# Install as global tool
+uv tool install onomatool
+onomatool '*.pdf'
+```
+
 ---
 
 ## 11. Code Quality
@@ -475,9 +489,9 @@ uv run pytest --cov=onomatool              # With coverage
 ### 11.3 Quality Commands
 
 ```bash
-ruff check --fix .          # Lint with auto-fix
-ruff format .               # Format code
-ruff check . && ruff format --check .  # Validate (CI)
+uv run ruff check --fix .          # Lint with auto-fix
+uv run ruff format .               # Format code
+uv run ruff check . && uv run ruff format --check .  # Validate (CI)
 ```
 
 ---

@@ -6,29 +6,36 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 OnomaTool is an AI-powered file renaming tool that uses LLMs (OpenAI/Google Gemini) to generate intelligent filename suggestions. It processes various file types (PDFs, images, documents, SVGs, etc.) by extracting content and using AI to suggest meaningful names following configurable naming conventions.
 
+## Package Manager
+
+This project uses **uv** for all dependency management and task execution. The tool is runnable via `uvx onomatool` without installation, or installed globally via `uv tool install onomatool`.
+
+- Install uv: `curl -LsSf https://astral.sh/uv/install.sh | sh`
+- Do NOT use pip directly — always use `uv` commands
+
 ## Development Commands
 
-**Note**: This project uses the `uv` package manager for dependency management and task execution. Install it with `pip install uv` or follow the [official installation guide](https://docs.astral.sh/uv/getting-started/installation/).
-
 ### Core Commands
-- `uv pip install -e .`: Install the package in development mode
-- `onomatool --save-config`: Generate default configuration file
-- `uv run pytest`: Run the test suite
+- `uv sync`: Install all dependencies (creates .venv automatically)
+- `uv sync --all-extras`: Install with dev dependencies
+- `uv run onomatool --save-config`: Generate default configuration file
+- `uv run onomatool '*.pdf'`: Run the tool in development
+- `uvx onomatool '*.pdf'`: Run directly without install
+
+### Testing
+- `uv run pytest`: Run the full test suite
 - `uv run pytest tests/test_usage_enduser.py`: Run end-to-end user tests
 - `uv run pytest tests/test_utf8_encoding.py`: Run UTF-8 encoding tests
 - `uv run pytest --cov=onomatool`: Run tests with coverage
-
-### Code Quality
-- `ruff check --fix .`: Run linter and auto-fix issues
-- `ruff format .`: Format code
-- `./scripts/check-format.sh`: Run import sorting and formatting
-- `ruff check . && ruff format --check .`: Validate code style
-
-### Testing Individual Components
 - `uv run pytest tests/test_config.py`: Test configuration system
 - `uv run pytest tests/test_conflict_resolver.py`: Test filename conflict resolution
 - `uv run pytest tests/test_file_collector.py`: Test file collection/globbing
 - `uv run pytest tests/test_renamer.py`: Test file renaming logic
+
+### Code Quality
+- `uv run ruff check --fix .`: Run linter and auto-fix issues
+- `uv run ruff format .`: Format code
+- `uv run ruff check . && uv run ruff format --check .`: Validate code style (CI)
 
 ## Architecture Overview
 
@@ -90,16 +97,11 @@ The project has comprehensive tests covering:
 ## Development Notes
 
 - Python 3.10+ required
-- Uses the `uv` package manager for dependency management and task execution
+- Uses `uv` for dependency management; `uvx` for direct execution
 - Uses setuptools build system with `pyproject.toml`
 - Entry point: `onomatool.cli:console_script`
 - Follows PEP 8 conventions with Ruff for linting/formatting
 - Modular architecture allows easy extension of file processors
 - Comprehensive error handling with graceful failures
 - Supports both local and cloud LLM endpoints
-
-### Package Manager Usage
-- Install dependencies: `uv pip install -r requirements.txt`
-- Install development dependencies: `uv pip install -e .`
-- Run commands: `uv run <command>` (e.g., `uv run pytest`)
-- Sync dependencies: `uv pip sync requirements.txt`Use 'bd' for task tracking
+Use 'bd' for task tracking
