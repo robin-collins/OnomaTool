@@ -36,8 +36,14 @@ def sanitize_filename(name: str) -> str:
     # Replace control characters (0x00-0x1F)
     name = re.sub(r"[\x00-\x1f]", "_", name)
 
+    # Replace Unicode fullwidth path separators (U+FF0F, U+FF3C)
+    name = name.replace("\uff0f", "_").replace("\uff3c", "_")
+
     # Strip leading/trailing dots and spaces
     name = name.strip(". ")
+
+    # Neutralize path traversal sequences after stripping
+    name = name.replace("..", "_")
 
     # Handle Windows reserved names
     base_name = name.split(".")[0].upper()

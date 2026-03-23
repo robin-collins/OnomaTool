@@ -1,3 +1,4 @@
+import atexit
 import logging
 import os
 import tempfile
@@ -8,6 +9,23 @@ import chardet
 logger = logging.getLogger(__name__)
 
 from onomatool.models import ProcessingResult
+
+# Module-level registry for atexit cleanup of temp files
+_temp_file_registry: list[str] = []
+
+
+def _cleanup_temp_files():
+    """Remove any leftover temp files on process exit."""
+    for path in _temp_file_registry:
+        try:
+            if os.path.exists(path):
+                os.unlink(path)
+        except OSError:
+            pass
+    _temp_file_registry.clear()
+
+
+atexit.register(_cleanup_temp_files)
 
 
 class TextProcessor:
@@ -71,6 +89,7 @@ class TextProcessor:
             temp_file.close()
 
             self.temp_files_created.append(temp_file.name)
+            _temp_file_registry.append(temp_file.name)
             return temp_file.name
 
         except Exception as e:

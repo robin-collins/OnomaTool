@@ -1,4 +1,19 @@
-"""Processor package with plugin protocol and discovery."""
+"""Processor package with plugin protocol and discovery.
+
+SECURITY NOTE — Plugin Trust Boundary
+======================================
+Processor plugins run with the same privileges as OnomaTool itself.
+Both discovery mechanisms execute arbitrary Python code:
+
+1. **Entry-point plugins** (``onomatool.processors`` group) — loaded from
+   installed packages. Any package in the environment can register a plugin.
+2. **extra_processors** (config-driven) — loaded from ``module:ClassName``
+   strings in ``~/.onomarc``. This is intentional code execution controlled
+   by the config file owner.
+
+Users should only install packages and configure extra_processors from
+trusted sources. There is no sandboxing or capability restriction on plugins.
+"""
 
 import importlib
 import logging
@@ -54,10 +69,15 @@ def discover_entry_point_plugins() -> list[ProcessorProtocol]:
 
 
 def load_extra_processors(module_paths: list[str]) -> list[ProcessorProtocol]:
-    """Load processors from ad-hoc module paths specified in config."""
+    """Load processors from ad-hoc module paths specified in config.
+
+    WARNING: This executes arbitrary code from the configured module paths.
+    Only configure extra_processors with trusted modules.
+    """
     plugins: list[ProcessorProtocol] = []
 
     for path in module_paths:
+        logger.info("Loading extra processor (trusted code): %s", path)
         try:
             # path format: "my_package.module:ClassName"
             if ":" in path:

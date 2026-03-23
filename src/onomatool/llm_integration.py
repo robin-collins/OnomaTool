@@ -1,4 +1,5 @@
 import base64
+import functools
 import json
 import logging
 import mimetypes
@@ -13,6 +14,7 @@ import tiktoken
 logger = logging.getLogger(__name__)
 
 from onomatool.config import get_config
+from onomatool.exceptions import OnomaLLMError
 from onomatool.models import (
     generate_json_schema_from_model,
     get_model_for_naming_convention,
@@ -293,15 +295,32 @@ class GoogleProvider:
         else:
             contents = user_prompt
 
+        # Use JSON mode with schema for structured output
         response = client.models.generate_content(
             model=model,
             contents=contents,
             config=types.GenerateContentConfig(
                 max_output_tokens=MAX_TOKENS,
+                response_mime_type="application/json",
+                response_schema={
+                    "type": "OBJECT",
+                    "properties": {
+                        "suggestions": {
+                            "type": "ARRAY",
+                            "items": {"type": "STRING"},
+                        }
+                    },
+                    "required": ["suggestions"],
+                },
             ),
         )
 
-        suggestions = re.findall(r'"([a-zA-Z0-9_\-\. ]{1,128})"', response.text)
+        try:
+            result = json.loads(response.text)
+            suggestions = result["suggestions"]
+        except (json.JSONDecodeError, KeyError, TypeError):
+            # Fallback to regex if JSON parsing fails
+            suggestions = re.findall(r'"([a-zA-Z0-9_\-\. ]{1,128})"', response.text)
 
         if verbose_level > 0:
             logger.debug("Response: suggestions=%s", suggestions[:3])
@@ -537,7 +556,7 @@ def get_suggestions(
         return result
     except Exception as err:
         provider_name = config.get("default_provider", "openai")
-        raise RuntimeError(f"{provider_name} LLM call failed: {err}") from err
+        raise OnomaLLMError(f"{provider_name} LLM call failed: {err}") from err
 
 
 def _log_verbose_request(
@@ -603,12 +622,18 @@ def _redact_messages(messages: list, redact_text: bool = True) -> list:
     return [redact(m) for m in messages]
 
 
+@functools.lru_cache(maxsize=8)
+def _get_tiktoken_encoding(model: str):
+    """Get and cache tiktoken encoding for a model."""
+    try:
+        return tiktoken.encoding_for_model(model)
+    except KeyError:
+        return tiktoken.get_encoding("cl100k_base")
+
+
 def count_tokens_for_messages(messages: list, model: str = "gpt-4o") -> int:
     """Count tokens for OpenAI chat completion messages using tiktoken."""
-    try:
-        encoding = tiktoken.encoding_for_model(model)
-    except KeyError:
-        encoding = tiktoken.get_encoding("cl100k_base")
+    encoding = _get_tiktoken_encoding(model)
 
     tokens_per_message = 3
     tokens_per_name = 1
@@ -635,8 +660,5 @@ def count_tokens_for_messages(messages: list, model: str = "gpt-4o") -> int:
 
 def count_text_tokens(text: str, model: str = "gpt-4o") -> int:
     """Count tokens for a text string using tiktoken."""
-    try:
-        encoding = tiktoken.encoding_for_model(model)
-    except KeyError:
-        encoding = tiktoken.get_encoding("cl100k_base")
+    encoding = _get_tiktoken_encoding(model)
     return len(encoding.encode(text))

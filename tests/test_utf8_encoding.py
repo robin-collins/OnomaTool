@@ -268,7 +268,7 @@ class TestUTF8Encoding(unittest.TestCase):
         try:
             # Mock chardet to return low confidence
             with patch(
-                "onomatool.processors.markitdown_processor.chardet.detect"
+                "onomatool.utils.encoding.chardet.detect"
             ) as mock_detect:
                 mock_detect.return_value = {"encoding": "iso-8859-1", "confidence": 0.5}
 

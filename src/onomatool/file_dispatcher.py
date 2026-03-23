@@ -1,5 +1,6 @@
 import logging
 
+from .constants import TEXT_EXTENSIONS
 from .processors import (
     ProcessorProtocol,
     discover_entry_point_plugins,
@@ -18,27 +19,7 @@ class FileDispatcher:
         self.config = config
         self.debug = debug
 
-        # Text file extensions that should be processed directly without MarkItDown
-        self.text_extensions = {
-            ".txt",
-            ".md",
-            ".note",
-            ".text",
-            ".log",
-            ".csv",
-            ".json",
-            ".xml",
-            ".html",
-            ".htm",
-            ".py",
-            ".js",
-            ".css",
-            ".yaml",
-            ".yml",
-            ".toml",
-            ".ini",
-            ".cfg",
-        }
+        self.text_extensions = TEXT_EXTENSIONS
 
         self.processors: dict[str, object] = {}
         # Initialize text processor for all text extensions

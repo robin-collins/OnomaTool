@@ -5,6 +5,7 @@ import sys
 
 import tomli_w
 
+from onomatool import __version__
 from onomatool.config import DEFAULT_CONFIG, get_config
 from onomatool.history import RenameHistory
 from onomatool.model_discovery import (
@@ -23,11 +24,24 @@ def main(args=None):
             args = sys.argv[1:]
         parser = argparse.ArgumentParser(
             description="Onoma - AI-powered file renaming tool",
-            epilog="Configuration is loaded from ~/.onomarc (TOML format)",
+            epilog=(
+                "Supported file types: PDF, DOCX, PPTX, images (JPG/PNG/SVG), "
+                "text (TXT/MD/CSV/JSON/XML/HTML), code (PY/JS/CSS/YAML).\n"
+                "Naming conventions: snake_case, camelCase, kebab-case, PascalCase, "
+                "dot.notation, natural language.\n"
+                "Providers: OpenAI, Azure OpenAI, Google Gemini, local LLM (LMStudio).\n"
+                "Config: ~/.onomarc (TOML format). Run --save-config to generate defaults."
+            ),
+            formatter_class=argparse.RawDescriptionHelpFormatter,
             add_help=False,
         )
         parser.add_argument(
             "-h", "--help", action="help", help="Show this help message and exit"
+        )
+        parser.add_argument(
+            "--version",
+            action="version",
+            version=f"%(prog)s {__version__}",
         )
         parser.add_argument(
             "pattern",
@@ -92,6 +106,11 @@ def main(args=None):
             help="Check system dependency health and exit",
         )
         parser.add_argument(
+            "--deep",
+            action="store_true",
+            help="With --check, run end-to-end smoke tests on temp sample files",
+        )
+        parser.add_argument(
             "--exclude",
             action="append",
             default=[],
@@ -101,7 +120,7 @@ def main(args=None):
         parser.add_argument(
             "--sort",
             choices=["name", "size", "modified"],
-            help="Sort order for file processing (not yet implemented)",
+            help="Sort order for file processing",
         )
         parser.add_argument(
             "--undo",
@@ -128,8 +147,26 @@ def main(args=None):
         )
         args = parser.parse_args(args)
 
+        # Configure logging early, before any branch that might use it
+        if args.very_verbose:
+            verbose_level = 2
+        elif args.verbose:
+            verbose_level = 1
+        else:
+            verbose_level = 0
+
+        logging.basicConfig(
+            level=logging.DEBUG
+            if verbose_level >= 2
+            else logging.INFO
+            if verbose_level >= 1
+            else logging.WARNING,
+            format="[%(levelname)s] %(message)s",
+            stream=sys.stdout,
+        )
+
         if args.check:
-            return run_health_check()
+            return run_health_check(deep=args.deep)
 
         if args.save_config:
             save_default_config()
@@ -157,25 +194,6 @@ def main(args=None):
         format_override = args.format
 
         sort_order = args.sort
-
-        # Handle verbosity levels
-        if args.very_verbose:
-            verbose_level = 2
-        elif args.verbose:
-            verbose_level = 1
-        else:
-            verbose_level = 0
-
-        # Configure logging to output to stdout for better CLI integration
-        logging.basicConfig(
-            level=logging.DEBUG
-            if verbose_level >= 2
-            else logging.INFO
-            if verbose_level >= 1
-            else logging.WARNING,
-            format="[%(levelname)s] %(message)s",
-            stream=sys.stdout,
-        )
 
         config = get_config(args.config)
         with RenameHistory() as history:
@@ -225,7 +243,15 @@ def main(args=None):
 def _handle_undo(session_arg: str) -> int:
     """Handle --undo command."""
     history = RenameHistory()
-    session_id = None if session_arg == "latest" else int(session_arg)
+    if session_arg == "latest":
+        session_id = None
+    else:
+        try:
+            session_id = int(session_arg)
+        except ValueError:
+            print(f"Error: Invalid session ID '{session_arg}'. Use a number or 'latest'.")
+            history.close()
+            return 1
     results = history.undo_session(session_id)
     history.close()
 
@@ -267,13 +293,6 @@ def _handle_list_models(args) -> int:
     """Handle --list-models command."""
     config = get_config(args.config)
     verbose = args.verbose or args.very_verbose
-
-    if verbose:
-        logging.basicConfig(
-            level=logging.DEBUG,
-            format="[%(levelname)s] %(message)s",
-            stream=sys.stdout,
-        )
 
     try:
         models = list_models(config)
@@ -326,7 +345,7 @@ def _handle_select_model(args) -> int:
     return 0
 
 
-def run_health_check() -> int:
+def run_health_check(deep: bool = False) -> int:
     """Check system dependencies and print status."""
     import shutil
     import subprocess
@@ -389,7 +408,97 @@ def run_health_check() -> int:
     else:
         print("\nSome dependencies are missing. Install them for full functionality.")
 
+    if deep:
+        print("\n--- Deep checks ---")
+        deep_ok = _run_deep_checks()
+        all_ok = all_ok and deep_ok
+
     return 0 if all_ok else 1
+
+
+def _run_deep_checks() -> bool:
+    """Run end-to-end smoke tests on temp sample files."""
+    import tempfile
+
+    all_ok = True
+
+    # Test 1: Text file processing
+    try:
+        from onomatool.processors.text_processor import TextProcessor
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".txt", delete=False, encoding="utf-8"
+        ) as f:
+            f.write("This is a test document about software architecture.")
+            f.flush()
+            processor = TextProcessor()
+            result = processor.process(f.name)
+        os.unlink(f.name)
+        if result and result.markdown:
+            print("  Text processing          OK")
+        else:
+            print("  Text processing          FAILED (no output)")
+            all_ok = False
+    except Exception as e:
+        print(f"  Text processing          FAILED ({e})")
+        all_ok = False
+
+    # Test 2: PDF processing with PyMuPDF
+    try:
+        import fitz
+
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as f:
+            doc = fitz.open()
+            page = doc.new_page()
+            page.insert_text((72, 72), "Deep check test page")
+            doc.save(f.name)
+            doc.close()
+            # Re-open and verify page rendering
+            doc2 = fitz.open(f.name)
+            doc2[0].get_pixmap()
+            doc2.close()
+        os.unlink(f.name)
+        print("  PDF processing (PyMuPDF) OK")
+    except ImportError:
+        print("  PDF processing (PyMuPDF) SKIPPED (not installed)")
+    except Exception as e:
+        print(f"  PDF processing (PyMuPDF) FAILED ({e})")
+        all_ok = False
+
+    # Test 3: Config loading
+    try:
+        from onomatool.config import get_config
+
+        config = get_config()
+        if isinstance(config, dict) and "default_provider" in config:
+            print("  Config loading           OK")
+        else:
+            print("  Config loading           FAILED (invalid config)")
+            all_ok = False
+    except Exception as e:
+        print(f"  Config loading           FAILED ({e})")
+        all_ok = False
+
+    # Test 4: Sanitizer
+    try:
+        from onomatool.sanitizer import sanitize_filename
+
+        result = sanitize_filename("test/../file<name>.txt")
+        if ".." not in result and "<" not in result:
+            print("  Filename sanitization    OK")
+        else:
+            print("  Filename sanitization    FAILED (unsafe chars not removed)")
+            all_ok = False
+    except Exception as e:
+        print(f"  Filename sanitization    FAILED ({e})")
+        all_ok = False
+
+    if all_ok:
+        print("\nAll deep checks passed.")
+    else:
+        print("\nSome deep checks failed.")
+
+    return all_ok
 
 
 def save_default_config():

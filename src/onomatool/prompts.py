@@ -12,18 +12,37 @@ def get_system_prompt(config=None) -> str:
     return config.get("system_prompt") or DEFAULT_SYSTEM_PROMPT
 
 
+def _safe_format(template: str, **kwargs) -> str:
+    """Format a template string, ignoring unknown placeholders."""
+    import string
+
+    return string.Template(
+        # Convert {key} style to $key style for safe_substitute
+        template.replace("{", "${")
+    ).safe_substitute(**kwargs)
+
+
 def get_user_prompt(naming_convention: str, content: str, config=None) -> str:
     if config is None:
         config = get_config()
     min_words = config.get("min_filename_words", 5)
     max_words = config.get("max_filename_words", 15)
     template = config.get("user_prompt") or DEFAULT_USER_PROMPT
-    return template.format(
-        naming_convention=naming_convention,
-        content=content,
-        min_words=min_words,
-        max_words=max_words,
-    )
+    try:
+        return template.format(
+            naming_convention=naming_convention,
+            content=content,
+            min_words=min_words,
+            max_words=max_words,
+        )
+    except KeyError:
+        return _safe_format(
+            template,
+            naming_convention=naming_convention,
+            content=content,
+            min_words=str(min_words),
+            max_words=str(max_words),
+        )
 
 
 def get_image_prompt(naming_convention: str, config=None) -> str:
@@ -32,11 +51,19 @@ def get_image_prompt(naming_convention: str, config=None) -> str:
     min_words = config.get("min_filename_words", 5)
     max_words = config.get("max_filename_words", 15)
     template = config.get("image_prompt") or DEFAULT_IMAGE_PROMPT
-    return template.format(
-        naming_convention=naming_convention,
-        min_words=min_words,
-        max_words=max_words,
-    )
+    try:
+        return template.format(
+            naming_convention=naming_convention,
+            min_words=min_words,
+            max_words=max_words,
+        )
+    except KeyError:
+        return _safe_format(
+            template,
+            naming_convention=naming_convention,
+            min_words=str(min_words),
+            max_words=str(max_words),
+        )
 
 
 DEFAULT_SYSTEM_PROMPT = (

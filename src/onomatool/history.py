@@ -173,6 +173,8 @@ class RenameHistory:
 
             try:
                 os.rename(new, original)
+                # Mark as undone in DB so future undo won't re-process
+                self._mark_rename_undone(rename["id"])
                 results.append(
                     {
                         "original_path": original,
@@ -192,6 +194,14 @@ class RenameHistory:
                 )
 
         return results
+
+    def _mark_rename_undone(self, rename_id: int) -> None:
+        """Mark a single rename record as undone so it won't be re-processed."""
+        conn = self._connect()
+        conn.execute(
+            "UPDATE renames SET status = 'undone' WHERE id = ?", (rename_id,)
+        )
+        conn.commit()
 
     def prune(self, retention_days: int = DEFAULT_RETENTION_DAYS) -> int:
         """Remove sessions older than retention_days. Returns count of pruned sessions."""

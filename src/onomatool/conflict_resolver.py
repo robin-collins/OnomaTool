@@ -1,5 +1,9 @@
 import os
 
+from onomatool.exceptions import OnomaConflictError
+
+MAX_CONFLICT_ITERATIONS = 10_000
+
 
 def resolve_conflict(desired_name: str, existing_names: list[str]) -> str:
     """
@@ -11,14 +15,21 @@ def resolve_conflict(desired_name: str, existing_names: list[str]) -> str:
 
     Returns:
         A unique file name by appending a numeric suffix if needed
+
+    Raises:
+        RuntimeError: If no unique name found within MAX_CONFLICT_ITERATIONS
     """
-    if desired_name not in existing_names:
+    existing_set = set(existing_names)
+    if desired_name not in existing_set:
         return desired_name
 
     base, ext = os.path.splitext(desired_name)
-    counter = 2
-    while True:
+    for counter in range(2, MAX_CONFLICT_ITERATIONS + 2):
         new_name = f"{base}_{counter}{ext}"
-        if new_name not in existing_names:
+        if new_name not in existing_set:
             return new_name
-        counter += 1
+
+    raise OnomaConflictError(
+        f"Could not resolve filename conflict for '{desired_name}' "
+        f"after {MAX_CONFLICT_ITERATIONS} attempts"
+    )
