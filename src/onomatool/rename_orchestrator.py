@@ -53,6 +53,7 @@ class RenameOrchestrator:
         exclude_patterns: list[str] | None = None,
         history: "RenameHistory | None" = None,
         sort_order: str | None = None,
+        format_override: str | None = None,
     ):
         self.config = config
         self.dry_run = dry_run
@@ -60,6 +61,7 @@ class RenameOrchestrator:
         self.verbose_level = verbose_level
         self.exclude_patterns = exclude_patterns or []
         self.sort_order = sort_order
+        self.format_override = format_override
         self.dispatcher = FileDispatcher(config, debug=debug)
         self.planned_renames: list[tuple[str, str]] = []
         self._debug_tempdirs: list = []
@@ -152,7 +154,7 @@ class RenameOrchestrator:
                 return
 
         # Process file content
-        result = self.dispatcher.process(file_path)
+        result = self.dispatcher.process(file_path, self.format_override)
         if result is None:
             self._cleanup_tempdir(svg_tempdir)
             self.skipped_count += 1
@@ -237,6 +239,27 @@ class RenameOrchestrator:
                 self.history.record_rename(
                     self._session_id, file_path, new_path
                 )
+
+    def check_planned_renames(self) -> list[tuple[str, str, str]]:
+        """Re-resolve planned renames against current state.
+
+        Returns list of (file_path, dry_run_name, actual_name) tuples.
+        Only includes entries where the name changed.
+        """
+        changes = []
+        for file_path, new_name in self.planned_renames:
+            directory = os.path.dirname(file_path) or "."
+            _, ext = os.path.splitext(file_path)
+            base_new_name, _ = os.path.splitext(new_name)
+            new_name_with_ext = base_new_name + ext
+            # Dry-run resolved name (from original planned_renames)
+            dry_run_name = new_name_with_ext
+            # Re-resolve against current directory state
+            existing_files = os.listdir(directory)
+            actual_name = resolve_conflict(new_name_with_ext, existing_files)
+            if actual_name != dry_run_name:
+                changes.append((file_path, dry_run_name, actual_name))
+        return changes
 
     def execute_planned_renames(self) -> None:
         """Execute renames that were planned during dry-run."""

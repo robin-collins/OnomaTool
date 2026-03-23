@@ -42,20 +42,23 @@ class FileDispatcher:
             self.config.get("markitdown", {}), debug=debug
         )
 
-    def get_processor(self, file_path: str) -> object:
-        """Get appropriate processor for the given file"""
-        # Get file extension
+    def get_processor(self, file_path: str, format_override: str | None = None) -> object:
+        """Get appropriate processor for the given file."""
+        if format_override:
+            if format_override in ("text", "markdown"):
+                return TextProcessor()
+            # pdf, docx, image all use markitdown
+            return self.markitdown_processor
+
         from pathlib import Path
 
-        file_ext = Path(file_path).suffix.lower()  # '' when no suffix
+        file_ext = Path(file_path).suffix.lower()
 
-        # Check if it's a text file
         if file_ext in self.text_extensions:
             return self.processors[file_ext]
-        # Use markitdown for all other supported formats
         return self.markitdown_processor
 
-    def process(self, file_path: str):
-        """Process a file using the appropriate processor"""
-        processor = self.get_processor(file_path)
+    def process(self, file_path: str, format_override: str | None = None):
+        """Process a file using the appropriate processor."""
+        processor = self.get_processor(file_path, format_override)
         return processor.process(file_path)

@@ -133,10 +133,7 @@ def main(args=None):
         if args.interactive and not args.dry_run:
             parser.error("--interactive must be used with --dry-run")
 
-        if args.format:
-            logger.warning(
-                "--format is not yet implemented and will be ignored."
-            )
+        format_override = args.format
 
         sort_order = args.sort
 
@@ -166,12 +163,21 @@ def main(args=None):
             exclude_patterns=args.exclude,
             history=history,
             sort_order=sort_order,
+            format_override=format_override,
         )
 
         orchestrator.process_files(args.pattern)
 
         if args.dry_run and args.interactive and orchestrator.planned_renames:
-            confirm = input("\nProceed with these renames? [y/N]: ").strip().lower()
+            # Check if re-resolved names differ from dry-run preview
+            changes = orchestrator.check_planned_renames()
+            if changes:
+                print("\nNote: Some names changed since dry-run preview:")
+                for file_path, dry_name, actual_name in changes:
+                    print(f"  {os.path.basename(file_path)}: {dry_name} -> {actual_name}")
+                confirm = input("\nProceed with updated renames? [y/N]: ").strip().lower()
+            else:
+                confirm = input("\nProceed with these renames? [y/N]: ").strip().lower()
             if confirm == "y":
                 orchestrator.execute_planned_renames()
             else:
