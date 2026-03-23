@@ -1,0 +1,3 @@
+[submodule "reference/lmstudio-ai-docs"]
+	path = reference/lmstudio-ai-docs
+	url = git@github.com:robin-collins/lmstudio-ai-docs.git
