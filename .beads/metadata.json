@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "server",
+  "dolt_database": "OnomaTool",
+  "project_id": "96e617ac-cfe0-408f-af19-78cc18c67300"
+}
