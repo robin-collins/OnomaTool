@@ -96,6 +96,12 @@ quote-style = "double"
 indent-style = "space"
 line-ending = "lf"
 
+[tool.pytest.ini_options]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests requiring external services",
+]
+
 [dependency-groups]
 dev = [
     "pytest>=8.4.0",

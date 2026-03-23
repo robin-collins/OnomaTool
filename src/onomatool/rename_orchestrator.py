@@ -8,6 +8,7 @@ from onomatool.file_collector import collect_files
 from onomatool.file_dispatcher import FileDispatcher
 from onomatool.models import ProcessingResult
 from onomatool.renamer import rename_file
+from onomatool.sanitizer import sanitize_filename
 from onomatool.suggestion_strategy import select_strategy
 from onomatool.utils.image_utils import convert_svg_to_png
 
@@ -103,7 +104,8 @@ class RenameOrchestrator:
             return None, None
 
     def _execute_rename(self, file_path: str, new_name: str) -> None:
-        """Resolve conflicts and rename (or plan rename in dry-run)."""
+        """Sanitize, resolve conflicts, and rename (or plan rename in dry-run)."""
+        new_name = sanitize_filename(new_name)
         directory = os.path.dirname(file_path) or "."
         _, ext = os.path.splitext(file_path)
         base_new_name, _ = os.path.splitext(new_name)
