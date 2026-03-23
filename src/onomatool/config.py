@@ -53,6 +53,7 @@ class OnomatoolConfig(BaseModel):
     max_retries: int = Field(default=0, ge=0, le=10)
     retry_delay: float = Field(default=1.0, ge=0.0, le=60.0)
     rate_limit_delay: float = Field(default=0.0, ge=0.0, le=60.0)
+    history_retention_days: int = Field(default=90, ge=1, le=3650)
     markitdown: MarkitdownConfig = MarkitdownConfig()
 
     @field_validator("max_filename_words")

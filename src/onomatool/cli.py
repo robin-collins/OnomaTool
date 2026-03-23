@@ -138,10 +138,7 @@ def main(args=None):
                 "--format is not yet implemented and will be ignored."
             )
 
-        if args.sort:
-            logger.warning(
-                "--sort is not yet implemented and will be ignored."
-            )
+        sort_order = args.sort
 
         # Handle verbosity levels
         if args.very_verbose:
@@ -168,6 +165,7 @@ def main(args=None):
             verbose_level=verbose_level,
             exclude_patterns=args.exclude,
             history=history,
+            sort_order=sort_order,
         )
 
         orchestrator.process_files(args.pattern)

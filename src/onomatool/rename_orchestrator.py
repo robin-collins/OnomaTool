@@ -2,8 +2,10 @@
 
 import logging
 import os
+import shutil
 import sys
 import tempfile
+from datetime import datetime, timedelta
 
 from tqdm import tqdm
 
@@ -19,6 +21,25 @@ from onomatool.utils.image_utils import convert_svg_to_png
 
 logger = logging.getLogger(__name__)
 
+DEBUG_DIR = os.path.expanduser("~/.onoma_debug")
+DEBUG_RETENTION_DAYS = 7
+
+
+def _cleanup_old_debug_sessions(base_dir: str, retention_days: int = DEBUG_RETENTION_DAYS) -> None:
+    """Remove debug session directories older than retention_days."""
+    if not os.path.isdir(base_dir):
+        return
+    cutoff = datetime.now() - timedelta(days=retention_days)
+    for entry in os.scandir(base_dir):
+        if entry.is_dir():
+            try:
+                mtime = datetime.fromtimestamp(entry.stat().st_mtime)
+                if mtime < cutoff:
+                    shutil.rmtree(entry.path)
+                    logger.debug("Cleaned up old debug session: %s", entry.name)
+            except OSError:
+                pass
+
 
 class RenameOrchestrator:
     """Orchestrates file processing, LLM suggestions, and renaming."""
@@ -31,12 +52,14 @@ class RenameOrchestrator:
         verbose_level: int = 0,
         exclude_patterns: list[str] | None = None,
         history: "RenameHistory | None" = None,
+        sort_order: str | None = None,
     ):
         self.config = config
         self.dry_run = dry_run
         self.debug = debug
         self.verbose_level = verbose_level
         self.exclude_patterns = exclude_patterns or []
+        self.sort_order = sort_order
         self.dispatcher = FileDispatcher(config, debug=debug)
         self.planned_renames: list[tuple[str, str]] = []
         self._debug_tempdirs: list = []
@@ -45,18 +68,47 @@ class RenameOrchestrator:
         self.skipped_count = 0
         self.history = history
         self._session_id: int | None = None
+        self._debug_session_dir: str | None = None
+        if self.debug:
+            _cleanup_old_debug_sessions(DEBUG_DIR)
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            self._debug_session_dir = os.path.join(DEBUG_DIR, timestamp)
+            os.makedirs(self._debug_session_dir, exist_ok=True)
+            logger.debug("Debug output directory: %s", self._debug_session_dir)
 
     def process_files(self, pattern: str) -> None:
         """Process all files matching the glob pattern."""
         import fnmatch
 
         files = collect_files(pattern)
+
+        # Filter out hidden files (dotfiles) and zero-byte files
+        filtered = []
+        for f in files:
+            basename = os.path.basename(f)
+            if basename.startswith("."):
+                logger.debug("Skipping hidden file: %s", f)
+                continue
+            if os.path.getsize(f) == 0:
+                logger.debug("Skipping zero-byte file: %s", f)
+                continue
+            filtered.append(f)
+        files = filtered
+
         if self.exclude_patterns:
             files = [
                 f
                 for f in files
                 if not any(fnmatch.fnmatch(f, ep) for ep in self.exclude_patterns)
             ]
+
+        # Sort files
+        if self.sort_order == "name":
+            files.sort(key=lambda f: os.path.basename(f).lower())
+        elif self.sort_order == "size":
+            files.sort(key=lambda f: os.path.getsize(f))
+        elif self.sort_order == "modified":
+            files.sort(key=lambda f: os.path.getmtime(f))
 
         # Create history session for non-dry-run
         if self.history and not self.dry_run:
@@ -142,12 +194,14 @@ class RenameOrchestrator:
 
     def _convert_svg(self, file_path: str) -> tuple:
         """Convert SVG to PNG, returns (tempdir, png_path) or (tempdir, None) on failure."""
-        if self.debug:
-            tempdir_path = tempfile.mkdtemp(prefix="onoma_svg_")
+        if self.debug and self._debug_session_dir:
+            basename = os.path.splitext(os.path.basename(file_path))[0]
+            tempdir_path = os.path.join(self._debug_session_dir, f"svg_{basename}")
+            os.makedirs(tempdir_path, exist_ok=True)
             tempdir = type(
                 "TempDir", (), {"name": tempdir_path, "cleanup": lambda: None}
             )()
-            logger.debug("Created tempdir for SVG: %s", tempdir.name)
+            logger.debug("Created debug dir for SVG: %s", tempdir.name)
         else:
             tempdir = tempfile.TemporaryDirectory()
 
