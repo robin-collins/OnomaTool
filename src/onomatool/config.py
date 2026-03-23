@@ -1,9 +1,12 @@
+import logging
 import os
 from enum import Enum
 from typing import Any
 
 import tomli
 from pydantic import BaseModel, Field, ValidationError, field_validator
+
+logger = logging.getLogger(__name__)
 
 
 class Provider(str, Enum):
@@ -26,7 +29,11 @@ class MarkitdownConfig(BaseModel):
     docintel_endpoint: str = ""
 
 
+CURRENT_CONFIG_VERSION = 1
+
+
 class OnomatoolConfig(BaseModel):
+    config_version: int = Field(default=CURRENT_CONFIG_VERSION, ge=1)
     default_provider: Provider = Provider.openai
     openai_api_key: str = ""
     openai_base_url: str = "https://api.openai.com/v1"
@@ -45,6 +52,7 @@ class OnomatoolConfig(BaseModel):
     image_prompt: str = ""
     max_retries: int = Field(default=0, ge=0, le=10)
     retry_delay: float = Field(default=1.0, ge=0.0, le=60.0)
+    rate_limit_delay: float = Field(default=0.0, ge=0.0, le=60.0)
     markitdown: MarkitdownConfig = MarkitdownConfig()
 
     @field_validator("max_filename_words")
@@ -79,6 +87,7 @@ def get_config(config_path: str | None = None) -> dict[str, Any]:
         try:
             with open(config_path, "rb") as f:
                 raw = tomli.load(f)
+            raw = _migrate_config(raw)
             validated = OnomatoolConfig(**raw)
             result = validated.model_dump(mode="python")
             # Convert enums back to strings for dict consumers
@@ -86,7 +95,30 @@ def get_config(config_path: str | None = None) -> dict[str, Any]:
             result["naming_convention"] = str(validated.naming_convention.value)
             return result
         except ValidationError as e:
-            print(f"Configuration validation error: {e}")
+            logger.warning("Configuration validation error: %s", e)
         except Exception:
             pass
     return DEFAULT_CONFIG.copy()
+
+
+def _migrate_config(raw: dict) -> dict:
+    """Migrate config from older versions to the current schema.
+
+    Old configs without config_version are treated as version 1.
+    Each migration step upgrades one version at a time.
+    """
+    version = raw.get("config_version", 1)
+    if version >= CURRENT_CONFIG_VERSION:
+        return raw
+
+    raw = raw.copy()
+
+    # Future migrations go here, e.g.:
+    # if version < 2:
+    #     # Migrate from v1 to v2
+    #     raw.setdefault("new_field", "default_value")
+    #     version = 2
+
+    raw["config_version"] = CURRENT_CONFIG_VERSION
+    logger.info("Migrated config from version %d to %d", version, CURRENT_CONFIG_VERSION)
+    return raw

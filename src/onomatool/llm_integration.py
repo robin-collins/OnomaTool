@@ -21,6 +21,9 @@ from onomatool.prompts import get_image_prompt, get_system_prompt, get_user_prom
 # Maximum tokens for LLM response - limits response to 100 tokens
 MAX_TOKENS = 100
 
+# Track last API call time for rate limiting
+_last_call_time: float = 0.0
+
 # Maximum characters to send to LLM (approx 65,535 tokens)
 MAX_CONTENT_CHARS = 120_000
 
@@ -139,20 +142,20 @@ class OpenAIProvider:
         if verbose_level > 0:
             use_azure = self.config.get("use_azure_openai", False)
             if use_azure:
-                print("[DEBUG] Using Azure OpenAI")
-                print(
-                    f"[DEBUG] Azure endpoint: {self.config.get('azure_openai_endpoint')}"
+                logger.debug("Using Azure OpenAI")
+                logger.debug(
+                    "Azure endpoint: %s", self.config.get('azure_openai_endpoint')
                 )
-                print(
-                    f"[DEBUG] Azure deployment: {self.config.get('azure_openai_deployment')}"
+                logger.debug(
+                    "Azure deployment: %s", self.config.get('azure_openai_deployment')
                 )
             else:
-                print("[DEBUG] Using OpenAI")
-                print(
-                    f"[DEBUG] Base URL: {self.config.get('openai_base_url', 'https://api.openai.com/v1')}"
+                logger.debug("Using OpenAI")
+                logger.debug(
+                    "Base URL: %s", self.config.get('openai_base_url', 'https://api.openai.com/v1')
                 )
-            print(f"[DEBUG] Model: {model}")
-            print(f"[DEBUG] Pydantic Model: {pydantic_model.__name__}")
+            logger.debug("Model: %s", model)
+            logger.debug("Pydantic Model: %s", pydantic_model.__name__)
 
         if verbose_level > 1:
             _log_verbose_request(messages, json_schema, model, self.config)
@@ -170,15 +173,15 @@ class OpenAIProvider:
                 raise RuntimeError("Structured output parsing failed")
 
             if verbose_level > 0:
-                print("[DEBUG] Used structured output with Pydantic model")
-                print(f"[DEBUG] Response: suggestions={parsed_result.suggestions}")
+                logger.debug("Used structured output with Pydantic model")
+                logger.debug("Response: suggestions=%s", parsed_result.suggestions)
 
             return parsed_result.suggestions
 
         except Exception as structured_error:
             if verbose_level > 0:
-                print(f"[DEBUG] Structured output failed: {structured_error}")
-                print("[DEBUG] Falling back to JSON schema approach")
+                logger.debug("Structured output failed: %s", structured_error)
+                logger.debug("Falling back to JSON schema approach")
 
             # Fallback to traditional JSON schema approach
             response = client.chat.completions.create(
@@ -191,12 +194,12 @@ class OpenAIProvider:
             suggestions = result["suggestions"]
 
             if verbose_level > 0:
-                print("[DEBUG] Used JSON Schema fallback")
-                print(f"[DEBUG] Response: suggestions={suggestions}")
+                logger.debug("Used JSON Schema fallback")
+                logger.debug("Response: suggestions=%s", suggestions)
 
             if verbose_level > 1:
-                print(
-                    f"[DEBUG] Full response content: {response.choices[0].message.content}"
+                logger.debug(
+                    "Full response content: %s", response.choices[0].message.content
                 )
 
             if not (isinstance(suggestions, list) and len(suggestions) == 3):
@@ -230,8 +233,8 @@ class GoogleProvider:
         client = genai.Client(api_key=api_key)
 
         if verbose_level > 0:
-            print("[DEBUG] Using Google Gemini")
-            print(f"[DEBUG] Model: {model}")
+            logger.debug("Using Google Gemini")
+            logger.debug("Model: %s", model)
 
         # Extract user prompt from messages
         user_prompt = ""
@@ -250,8 +253,8 @@ class GoogleProvider:
         if verbose_level > 1:
             total_chars = len(user_prompt)
             total_tokens = count_text_tokens(user_prompt, "gpt-4o")
-            print(f"[DEBUG] Total characters in request: {total_chars}")
-            print(f"[DEBUG] Estimated tokens: {total_tokens}")
+            logger.debug("Total characters in request: %s", total_chars)
+            logger.debug("Estimated tokens: %s", total_tokens)
 
         response = client.models.generate_content(
             model=model,
@@ -264,10 +267,10 @@ class GoogleProvider:
         suggestions = re.findall(r'"([a-zA-Z0-9_\-\. ]{1,128})"', response.text)
 
         if verbose_level > 0:
-            print(f"[DEBUG] Response: suggestions={suggestions[:3]}")
+            logger.debug("Response: suggestions=%s", suggestions[:3])
 
         if verbose_level > 1:
-            print(f"[DEBUG] Full response text: {response.text}")
+            logger.debug("Full response text: %s", response.text)
 
         if len(suggestions) < 3:
             raise RuntimeError("Google LLM did not return enough suggestions.")
@@ -296,6 +299,20 @@ def get_provider(config: dict) -> LLMProvider:
 
 
 # --- Retry logic ---
+
+
+def _apply_rate_limit(delay: float, verbose_level: int = 0) -> None:
+    """Sleep if needed to enforce rate_limit_delay between consecutive API calls."""
+    global _last_call_time
+    if delay <= 0:
+        return
+    now = time.monotonic()
+    elapsed = now - _last_call_time
+    if _last_call_time > 0 and elapsed < delay:
+        wait = delay - elapsed
+        if verbose_level > 0:
+            logger.debug("Rate limit: waiting %.2fs before next API call", wait)
+        time.sleep(wait)
 
 
 def _is_transient_error(err: Exception) -> bool:
@@ -407,8 +424,8 @@ def get_suggestions(
     # Truncate content
     truncated_content = content[:MAX_CONTENT_CHARS]
     if len(content) > MAX_CONTENT_CHARS and verbose_level > 0:
-        print(
-            f"[DEBUG] Content truncated from {len(content)} to {MAX_CONTENT_CHARS} characters"
+        logger.debug(
+            "Content truncated from %s to %s characters", len(content), MAX_CONTENT_CHARS
         )
 
     # Detect image files
@@ -460,14 +477,23 @@ def get_suggestions(
     provider = get_provider(config)
     max_retries = config.get("max_retries", 0)
     retry_delay = config.get("retry_delay", 1.0)
+    rate_limit_delay = config.get("rate_limit_delay", 0.0)
+
+    # Apply rate limiting between consecutive API calls
+    global _last_call_time
+    _apply_rate_limit(rate_limit_delay, verbose_level)
+
     try:
-        return _call_provider_with_retry(
+        result = _call_provider_with_retry(
             provider, messages, pydantic_model, json_schema, model,
             verbose_level, max_retries, retry_delay,
         )
+        return result
     except Exception as err:
         provider_name = config.get("default_provider", "openai")
         raise RuntimeError(f"{provider_name} LLM call failed: {err}") from err
+    finally:
+        _last_call_time = time.monotonic()
 
 
 def _log_verbose_request(
@@ -476,10 +502,10 @@ def _log_verbose_request(
     """Log detailed request info for -vv mode."""
     min_words = config.get("min_filename_words", 5)
     max_words = config.get("max_filename_words", 15)
-    print(f"[DEBUG] JSON Schema: {json.dumps(json_schema, indent=2)}")
-    print(f"[DEBUG] Max tokens: {MAX_TOKENS}")
-    print(f"[DEBUG] Min filename words: {min_words}")
-    print(f"[DEBUG] Max filename words: {max_words}")
+    logger.debug("JSON Schema: %s", json.dumps(json_schema, indent=2))
+    logger.debug("Max tokens: %s", MAX_TOKENS)
+    logger.debug("Min filename words: %s", min_words)
+    logger.debug("Max filename words: %s", max_words)
 
     has_image = any(
         isinstance(msg.get("content"), list)
@@ -500,17 +526,17 @@ def _log_verbose_request(
                         total_chars = len(item.get("text", ""))
     total_tokens = count_tokens_for_messages(messages, model)
 
-    print(f"[DEBUG] Total characters in request: {total_chars}")
-    print(f"[DEBUG] Estimated tokens: {total_tokens}")
+    logger.debug("Total characters in request: %s", total_chars)
+    logger.debug("Estimated tokens: %s", total_tokens)
 
     redacted = _redact_messages(messages, redact_text=redact_text)
-    print(f"[DEBUG] Messages: {json.dumps(redacted, indent=2)}")
+    logger.debug("Messages: %s", json.dumps(redacted, indent=2))
 
     if redact_text:
-        print("[DEBUG] Text content redacted as [[file_content]]")
+        logger.debug("Text content redacted as [[file_content]]")
     else:
-        print(
-            "[DEBUG] Image content - text not redacted, base64 images redacted"
+        logger.debug(
+            "Image content - text not redacted, base64 images redacted"
         )
 
 

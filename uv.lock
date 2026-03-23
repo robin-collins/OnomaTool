@@ -781,6 +781,7 @@ dependencies = [
     { name = "tiktoken" },
     { name = "tomli" },
     { name = "tomli-w" },
+    { name = "tqdm" },
 ]
 
 [package.optional-dependencies]
@@ -814,6 +815,7 @@ requires-dist = [
     { name = "tiktoken", specifier = ">=0.9.0" },
     { name = "tomli", specifier = ">=2.2.1" },
     { name = "tomli-w", specifier = ">=1.1.0" },
+    { name = "tqdm", specifier = ">=4.66.0" },
 ]
 provides-extras = ["dev"]
 

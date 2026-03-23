@@ -76,7 +76,7 @@ def test_config_precedence(tmp_path):
     assert loaded["max_filename_words"] == 8
 
 
-def test_validation_error_falls_back(tmp_path, capsys):
+def test_validation_error_falls_back(tmp_path, caplog):
     """TC-CFG-005: Invalid values fall back to defaults with error message."""
     data = {"min_filename_words": 0}  # Below minimum
     config_path = tmp_path / "invalid.toml"
@@ -84,5 +84,4 @@ def test_validation_error_falls_back(tmp_path, capsys):
     loaded = get_config(str(config_path))
     # Should fall back to defaults
     assert loaded == DEFAULT_CONFIG
-    captured = capsys.readouterr()
-    assert "validation error" in captured.out.lower()
+    assert "validation error" in caplog.text.lower()

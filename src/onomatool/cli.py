@@ -1,11 +1,15 @@
 import argparse
+import logging
 import os
 import sys
 
 import tomli_w
 
 from onomatool.config import DEFAULT_CONFIG, get_config
+from onomatool.history import RenameHistory
 from onomatool.rename_orchestrator import RenameOrchestrator
+
+logger = logging.getLogger(__name__)
 
 
 def main(args=None):
@@ -96,13 +100,16 @@ def main(args=None):
         )
         parser.add_argument(
             "--undo",
-            action="store_true",
-            help="Undo last rename operation (not yet implemented)",
+            nargs="?",
+            const="latest",
+            default=None,
+            metavar="SESSION_ID",
+            help="Undo a rename session (defaults to most recent)",
         )
         parser.add_argument(
             "--history",
             action="store_true",
-            help="Show rename history (not yet implemented)",
+            help="Show recent rename sessions",
         )
         args = parser.parse_args(args)
 
@@ -111,16 +118,14 @@ def main(args=None):
 
         if args.save_config:
             save_default_config()
-            print("Default configuration saved to ~/.onomarc")
+            logger.info("Default configuration saved to ~/.onomarc")
             return 0
 
-        if args.undo:
-            print("Warning: --undo is not yet implemented.")
-            return 0
+        if args.undo is not None:
+            return _handle_undo(args.undo)
 
         if args.history:
-            print("Warning: --history is not yet implemented.")
-            return 0
+            return _handle_history()
 
         if not args.pattern:
             parser.error("the following arguments are required: pattern")
@@ -129,13 +134,13 @@ def main(args=None):
             parser.error("--interactive must be used with --dry-run")
 
         if args.format:
-            print(
-                "Warning: --format is not yet implemented and will be ignored."
+            logger.warning(
+                "--format is not yet implemented and will be ignored."
             )
 
         if args.sort:
-            print(
-                "Warning: --sort is not yet implemented and will be ignored."
+            logger.warning(
+                "--sort is not yet implemented and will be ignored."
             )
 
         # Handle verbosity levels
@@ -146,13 +151,23 @@ def main(args=None):
         else:
             verbose_level = 0
 
+        # Configure logging to output to stdout for better CLI integration
+        logging.basicConfig(
+            level=logging.DEBUG if verbose_level >= 2 else logging.INFO if verbose_level >= 1 else logging.WARNING,
+            format="[%(levelname)s] %(message)s",
+            stream=sys.stdout,
+        )
+
         config = get_config(args.config)
+        history = RenameHistory()
+        history.prune(config.get("history_retention_days", 90))
         orchestrator = RenameOrchestrator(
             config=config,
             dry_run=args.dry_run,
             debug=args.debug,
             verbose_level=verbose_level,
             exclude_patterns=args.exclude,
+            history=history,
         )
 
         orchestrator.process_files(args.pattern)
@@ -169,8 +184,47 @@ def main(args=None):
     except SystemExit:
         raise
     except Exception as e:
-        print(f"An error occurred: {e}")
+        logger.error(f"An error occurred: {e}")
         return 1
+    return 0
+
+
+def _handle_undo(session_arg: str) -> int:
+    """Handle --undo command."""
+    history = RenameHistory()
+    session_id = None if session_arg == "latest" else int(session_arg)
+    results = history.undo_session(session_id)
+    history.close()
+
+    ok_count = 0
+    for r in results:
+        if r["status"] == "ok":
+            print(r["message"])
+            ok_count += 1
+        elif r["status"] == "warning":
+            print(f"Warning: {r['message']}")
+        else:
+            print(f"Error: {r['message']}")
+
+    if ok_count > 0:
+        print(f"\nUndid {ok_count} rename(s)")
+    return 0
+
+
+def _handle_history() -> int:
+    """Handle --history command."""
+    history = RenameHistory()
+    sessions = history.list_sessions()
+    history.close()
+
+    if not sessions:
+        print("No rename sessions found.")
+        return 0
+
+    print(f"{'ID':>6}  {'Timestamp':25s}  {'Files':>5}  {'Directory'}")
+    print("-" * 70)
+    for s in sessions:
+        print(f"{s['id']:>6}  {s['timestamp']:25s}  {s['file_count']:>5}  {s['working_dir']}")
     return 0
 
 
@@ -252,7 +306,7 @@ def save_default_config():
         with open(config_path, "wb") as f:
             tomli_w.dump(config, f)
     except Exception as e:
-        print(f"Error saving default config: {e}")
+        logger.error(f"Error saving default config: {e}")
         sys.exit(1)
 
 

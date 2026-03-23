@@ -47,6 +47,7 @@ dependencies = [
     "cairosvg>=2.8.2",
     "pillow>=11.2.1",
     "PyMuPDF>=1.26.1",
+    "tqdm>=4.66.0",
 ]
 
 [project.optional-dependencies]

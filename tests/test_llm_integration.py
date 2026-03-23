@@ -107,8 +107,13 @@ class TestGetSuggestions:
                 config=config,
             )
 
-    def test_get_suggestions_content_truncation(self, capsys):
+    def test_get_suggestions_content_truncation(self, caplog):
         """TC-LI-009: Test content truncation - get_suggestions should handle content longer than MAX_CONTENT_CHARS."""
+        import logging
+
+        # Set log level to DEBUG to capture debug messages
+        caplog.set_level(logging.DEBUG)
+
         config = {
             "default_provider": "mock",
             "naming_convention": "snake_case",
@@ -128,8 +133,7 @@ class TestGetSuggestions:
         assert suggestions == ["mock_file_one", "mock_file_two", "mock_file_three"]
 
         # Check that truncation was logged
-        captured = capsys.readouterr()
-        assert "Content truncated" in captured.out
+        assert "Content truncated" in caplog.text
 
 
 class TestIsImageFile:
