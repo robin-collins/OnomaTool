@@ -55,3 +55,51 @@ def test_alternate_config(temp_copy):
     assert result == 0
     renamed = os.path.join(os.path.dirname(temp_copy), "mock_file_one.md")
     assert os.path.exists(renamed)
+
+
+# CLI edge case tests (§2.4)
+
+
+def test_missing_pattern_error():
+    """TC-E2E-002: Missing pattern exits with error."""
+    with pytest.raises(SystemExit):
+        main([])
+
+
+def test_interactive_without_dry_run():
+    """TC-E2E-004: --interactive without --dry-run is rejected."""
+    with pytest.raises(SystemExit):
+        main(["*.txt", "--interactive", "--config", MOCK_CONFIG])
+
+
+def test_save_config(tmp_path, monkeypatch):
+    """TC-E2E-005: --save-config creates config file."""
+    config_path = tmp_path / ".onomarc"
+    monkeypatch.setattr(
+        "os.path.expanduser", lambda p: str(config_path) if p == "~/.onomarc" else p
+    )
+    result = main(["--save-config"])
+    assert result == 0
+    assert config_path.exists()
+
+
+def test_batch_rename_multiple(tmp_path):
+    """TC-E2E-006: Multiple files are renamed in batch."""
+    for name in ["a.txt", "b.txt"]:
+        (tmp_path / name).write_text(f"content of {name}")
+    result = main([str(tmp_path / "*.txt"), "--config", MOCK_CONFIG])
+    assert result == 0
+    # Original files should be gone
+    assert not (tmp_path / "a.txt").exists()
+    assert not (tmp_path / "b.txt").exists()
+
+
+def test_interactive_abort(temp_copy, capsys, monkeypatch):
+    """TC-E2E-007: Interactive mode with 'n' aborts rename."""
+    monkeypatch.setattr(builtins, "input", lambda _: "n")
+    result = main([temp_copy, "--config", MOCK_CONFIG, "--dry-run", "--interactive"])
+    assert result == 0
+    # File should still exist (abort)
+    assert os.path.exists(temp_copy)
+    captured = capsys.readouterr()
+    assert "Aborted" in captured.out
