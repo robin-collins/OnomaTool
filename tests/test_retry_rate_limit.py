@@ -21,11 +21,14 @@ class TransientErrorProvider:
         self.fail_count = fail_count
         self.call_count = 0
 
-    def get_suggestions(self, messages, pydantic_model, json_schema, model, verbose_level):
+    def get_suggestions(
+        self, messages, pydantic_model, json_schema, model, verbose_level
+    ):
         self.call_count += 1
         if self.call_count <= self.fail_count:
             # Simulate OpenAI APIStatusError with 503
             from openai import APIStatusError
+
             raise APIStatusError(
                 message="Service Unavailable",
                 response=Mock(status_code=503),
@@ -43,7 +46,9 @@ class PermanentErrorProvider:
     def __init__(self):
         self.call_count = 0
 
-    def get_suggestions(self, messages, pydantic_model, json_schema, model, verbose_level):
+    def get_suggestions(
+        self, messages, pydantic_model, json_schema, model, verbose_level
+    ):
         self.call_count += 1
         raise RuntimeError("Permanent error: invalid API key")
 
@@ -57,7 +62,9 @@ class SuccessProvider:
     def __init__(self):
         self.call_count = 0
 
-    def get_suggestions(self, messages, pydantic_model, json_schema, model, verbose_level):
+    def get_suggestions(
+        self, messages, pydantic_model, json_schema, model, verbose_level
+    ):
         self.call_count += 1
         return ["file_one", "file_two", "file_three"]
 
@@ -78,8 +85,14 @@ def test_tc_ret_001_max_retries_zero_fails_immediately():
 
     with pytest.raises(Exception):
         _call_provider_with_retry(
-            provider, messages, pydantic_model, json_schema, model,
-            verbose_level=0, max_retries=0, retry_delay=0.1
+            provider,
+            messages,
+            pydantic_model,
+            json_schema,
+            model,
+            verbose_level=0,
+            max_retries=0,
+            retry_delay=0.1,
         )
 
     assert provider.call_count == 1
@@ -94,8 +107,14 @@ def test_tc_ret_002_transient_error_retried_up_to_max():
     model = "gpt-4o"
 
     result = _call_provider_with_retry(
-        provider, messages, pydantic_model, json_schema, model,
-        verbose_level=0, max_retries=3, retry_delay=0.01
+        provider,
+        messages,
+        pydantic_model,
+        json_schema,
+        model,
+        verbose_level=0,
+        max_retries=3,
+        retry_delay=0.01,
     )
 
     assert result == ["success_one", "success_two", "success_three"]
@@ -112,8 +131,14 @@ def test_tc_ret_003_permanent_error_not_retried():
 
     with pytest.raises(RuntimeError, match="Permanent error"):
         _call_provider_with_retry(
-            provider, messages, pydantic_model, json_schema, model,
-            verbose_level=0, max_retries=3, retry_delay=0.01
+            provider,
+            messages,
+            pydantic_model,
+            json_schema,
+            model,
+            verbose_level=0,
+            max_retries=3,
+            retry_delay=0.01,
         )
 
     assert provider.call_count == 1  # Only called once
@@ -130,8 +155,14 @@ def test_tc_ret_004_exponential_backoff_timing():
 
     start = time.monotonic()
     result = _call_provider_with_retry(
-        provider, messages, pydantic_model, json_schema, model,
-        verbose_level=0, max_retries=3, retry_delay=retry_delay
+        provider,
+        messages,
+        pydantic_model,
+        json_schema,
+        model,
+        verbose_level=0,
+        max_retries=3,
+        retry_delay=retry_delay,
     )
     elapsed = time.monotonic() - start
 
@@ -154,8 +185,14 @@ def test_tc_ret_005_retry_attempts_logged_at_warning(caplog):
 
     with caplog.at_level("WARNING"):
         _call_provider_with_retry(
-            provider, messages, pydantic_model, json_schema, model,
-            verbose_level=0, max_retries=3, retry_delay=0.01
+            provider,
+            messages,
+            pydantic_model,
+            json_schema,
+            model,
+            verbose_level=0,
+            max_retries=3,
+            retry_delay=0.01,
         )
 
     # Should have 2 warning messages for the 2 failures

@@ -76,12 +76,16 @@ class TestExcludePatterns:
         (tmp_path / "exclude_me.txt").write_text("content")
         (tmp_path / "also_exclude.txt").write_text("content")
 
-        result = main([
-            str(tmp_path / "*.txt"),
-            "--config", MOCK_CONFIG,
-            "--exclude", "*exclude*",
-            "--dry-run",
-        ])
+        result = main(
+            [
+                str(tmp_path / "*.txt"),
+                "--config",
+                MOCK_CONFIG,
+                "--exclude",
+                "*exclude*",
+                "--dry-run",
+            ]
+        )
         assert result == 0
         # Only include_me.txt should be renamed (in real run)
         # In dry-run, just verify no error
@@ -92,13 +96,18 @@ class TestExcludePatterns:
         (tmp_path / "skip1.txt").write_text("content")
         (tmp_path / "skip2.txt").write_text("content")
 
-        result = main([
-            str(tmp_path / "*.txt"),
-            "--config", MOCK_CONFIG,
-            "--exclude", "*skip1*",
-            "--exclude", "*skip2*",
-            "--dry-run",
-        ])
+        result = main(
+            [
+                str(tmp_path / "*.txt"),
+                "--config",
+                MOCK_CONFIG,
+                "--exclude",
+                "*skip1*",
+                "--exclude",
+                "*skip2*",
+                "--dry-run",
+            ]
+        )
         assert result == 0
 
 
@@ -108,34 +117,46 @@ class TestSortOption:
     def test_sort_accepts_name(self, tmp_path):
         """--sort accepts 'name' as valid choice."""
         (tmp_path / "test.txt").write_text("content")
-        result = main([
-            str(tmp_path / "*.txt"),
-            "--config", MOCK_CONFIG,
-            "--sort", "name",
-            "--dry-run",
-        ])
+        result = main(
+            [
+                str(tmp_path / "*.txt"),
+                "--config",
+                MOCK_CONFIG,
+                "--sort",
+                "name",
+                "--dry-run",
+            ]
+        )
         assert result == 0
 
     def test_sort_accepts_size(self, tmp_path):
         """--sort accepts 'size' as valid choice."""
         (tmp_path / "test.txt").write_text("content")
-        result = main([
-            str(tmp_path / "*.txt"),
-            "--config", MOCK_CONFIG,
-            "--sort", "size",
-            "--dry-run",
-        ])
+        result = main(
+            [
+                str(tmp_path / "*.txt"),
+                "--config",
+                MOCK_CONFIG,
+                "--sort",
+                "size",
+                "--dry-run",
+            ]
+        )
         assert result == 0
 
     def test_sort_accepts_modified(self, tmp_path):
         """--sort accepts 'modified' as valid choice."""
         (tmp_path / "test.txt").write_text("content")
-        result = main([
-            str(tmp_path / "*.txt"),
-            "--config", MOCK_CONFIG,
-            "--sort", "modified",
-            "--dry-run",
-        ])
+        result = main(
+            [
+                str(tmp_path / "*.txt"),
+                "--config",
+                MOCK_CONFIG,
+                "--sort",
+                "modified",
+                "--dry-run",
+            ]
+        )
         assert result == 0
 
     def test_sort_rejects_invalid_choice(self):
@@ -150,56 +171,76 @@ class TestFormatOption:
     def test_format_accepts_text(self, tmp_path):
         """--format accepts 'text' as valid choice."""
         (tmp_path / "test.txt").write_text("content")
-        result = main([
-            str(tmp_path / "*.txt"),
-            "--config", MOCK_CONFIG,
-            "--format", "text",
-            "--dry-run",
-        ])
+        result = main(
+            [
+                str(tmp_path / "*.txt"),
+                "--config",
+                MOCK_CONFIG,
+                "--format",
+                "text",
+                "--dry-run",
+            ]
+        )
         assert result == 0
 
     def test_format_accepts_markdown(self, tmp_path):
         """--format accepts 'markdown' as valid choice."""
         (tmp_path / "test.md").write_text("# content")
-        result = main([
-            str(tmp_path / "*.md"),
-            "--config", MOCK_CONFIG,
-            "--format", "markdown",
-            "--dry-run",
-        ])
+        result = main(
+            [
+                str(tmp_path / "*.md"),
+                "--config",
+                MOCK_CONFIG,
+                "--format",
+                "markdown",
+                "--dry-run",
+            ]
+        )
         assert result == 0
 
     def test_format_accepts_pdf(self, tmp_path):
         """--format accepts 'pdf' as valid choice."""
         (tmp_path / "test.txt").write_text("content")
-        result = main([
-            str(tmp_path / "*.txt"),
-            "--config", MOCK_CONFIG,
-            "--format", "pdf",
-            "--dry-run",
-        ])
+        result = main(
+            [
+                str(tmp_path / "*.txt"),
+                "--config",
+                MOCK_CONFIG,
+                "--format",
+                "pdf",
+                "--dry-run",
+            ]
+        )
         assert result == 0
 
     def test_format_accepts_docx(self, tmp_path):
         """--format accepts 'docx' as valid choice."""
         (tmp_path / "test.txt").write_text("content")
-        result = main([
-            str(tmp_path / "*.txt"),
-            "--config", MOCK_CONFIG,
-            "--format", "docx",
-            "--dry-run",
-        ])
+        result = main(
+            [
+                str(tmp_path / "*.txt"),
+                "--config",
+                MOCK_CONFIG,
+                "--format",
+                "docx",
+                "--dry-run",
+            ]
+        )
         assert result == 0
 
     def test_format_accepts_image(self, tmp_path):
         """--format accepts 'image' as valid choice."""
         (tmp_path / "test.txt").write_text("content")
-        result = main([
-            str(tmp_path / "*.txt"),
-            "--config", MOCK_CONFIG,
-            "--format", "image",
-            "--dry-run",
-        ])
+        result = main(
+            [
+                str(tmp_path / "*.txt"),
+                "--config",
+                MOCK_CONFIG,
+                "--format",
+                "image",
+                "--dry-run",
+            ]
+        )
         assert result == 0
 
     def test_format_rejects_invalid_choice(self):
@@ -233,7 +274,9 @@ class TestUndoCommand:
 class TestHistoryCommand:
     """Test history functionality."""
 
-    def test_history_with_no_sessions_shows_message(self, capsys, tmp_path, monkeypatch):
+    def test_history_with_no_sessions_shows_message(
+        self, capsys, tmp_path, monkeypatch
+    ):
         """--history with no sessions shows 'No rename sessions found'."""
         # Use a temporary history database
         history_db = tmp_path / "history.db"
@@ -265,12 +308,15 @@ class TestVerbosityLevels:
     def test_verbose_sets_level_1(self, tmp_path, capsys):
         """-v sets verbose_level=1."""
         (tmp_path / "test.txt").write_text("content")
-        result = main([
-            str(tmp_path / "*.txt"),
-            "--config", MOCK_CONFIG,
-            "-v",
-            "--dry-run",
-        ])
+        result = main(
+            [
+                str(tmp_path / "*.txt"),
+                "--config",
+                MOCK_CONFIG,
+                "-v",
+                "--dry-run",
+            ]
+        )
         assert result == 0
         captured = capsys.readouterr()
         # With -v, we should see INFO level messages (e.g., [INFO])
@@ -279,12 +325,15 @@ class TestVerbosityLevels:
     def test_very_verbose_sets_level_2(self, tmp_path, capsys):
         """-vv sets verbose_level=2."""
         (tmp_path / "test.txt").write_text("content")
-        result = main([
-            str(tmp_path / "*.txt"),
-            "--config", MOCK_CONFIG,
-            "-vv",
-            "--dry-run",
-        ])
+        result = main(
+            [
+                str(tmp_path / "*.txt"),
+                "--config",
+                MOCK_CONFIG,
+                "-vv",
+                "--dry-run",
+            ]
+        )
         assert result == 0
         captured = capsys.readouterr()
         # With -vv, we should see DEBUG level messages
@@ -292,23 +341,29 @@ class TestVerbosityLevels:
     def test_verbose_long_form(self, tmp_path):
         """--verbose sets verbose_level=1."""
         (tmp_path / "test.txt").write_text("content")
-        result = main([
-            str(tmp_path / "*.txt"),
-            "--config", MOCK_CONFIG,
-            "--verbose",
-            "--dry-run",
-        ])
+        result = main(
+            [
+                str(tmp_path / "*.txt"),
+                "--config",
+                MOCK_CONFIG,
+                "--verbose",
+                "--dry-run",
+            ]
+        )
         assert result == 0
 
     def test_very_verbose_long_form(self, tmp_path):
         """--very-verbose sets verbose_level=2."""
         (tmp_path / "test.txt").write_text("content")
-        result = main([
-            str(tmp_path / "*.txt"),
-            "--config", MOCK_CONFIG,
-            "--very-verbose",
-            "--dry-run",
-        ])
+        result = main(
+            [
+                str(tmp_path / "*.txt"),
+                "--config",
+                MOCK_CONFIG,
+                "--very-verbose",
+                "--dry-run",
+            ]
+        )
         assert result == 0
 
 
@@ -320,11 +375,14 @@ class TestDryRunMode:
         test_file = tmp_path / "original.txt"
         test_file.write_text("test content")
 
-        result = main([
-            str(test_file),
-            "--config", MOCK_CONFIG,
-            "--dry-run",
-        ])
+        result = main(
+            [
+                str(test_file),
+                "--config",
+                MOCK_CONFIG,
+                "--dry-run",
+            ]
+        )
         assert result == 0
 
         # Original file should still exist
@@ -355,12 +413,15 @@ class TestInteractiveMode:
         # Mock user input to decline
         monkeypatch.setattr(builtins, "input", lambda _: "n")
 
-        result = main([
-            str(test_file),
-            "--config", MOCK_CONFIG,
-            "--dry-run",
-            "--interactive",
-        ])
+        result = main(
+            [
+                str(test_file),
+                "--config",
+                MOCK_CONFIG,
+                "--dry-run",
+                "--interactive",
+            ]
+        )
         assert result == 0
 
 

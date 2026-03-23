@@ -39,14 +39,13 @@ def test_exclude_single_pattern(temp_test_dir, mock_config):
     create_test_file(temp_test_dir, "keep2.txt")
     create_test_file(temp_test_dir, "ignore.log")
 
-    orch = RenameOrchestrator(
-        config=mock_config,
-        exclude_patterns=["*.log"]
-    )
+    orch = RenameOrchestrator(config=mock_config, exclude_patterns=["*.log"])
 
     processed = []
-    with patch.object(orch, '_process_single_file', side_effect=lambda f: processed.append(f)):
-        orch.process_files(str(temp_test_dir / '*'))
+    with patch.object(
+        orch, "_process_single_file", side_effect=lambda f: processed.append(f)
+    ):
+        orch.process_files(str(temp_test_dir / "*"))
 
     basenames = [os.path.basename(f) for f in processed]
     assert "keep1.txt" in basenames
@@ -60,14 +59,13 @@ def test_exclude_multiple_patterns(temp_test_dir, mock_config):
     create_test_file(temp_test_dir, "ignore1.log")
     create_test_file(temp_test_dir, "ignore2.tmp")
 
-    orch = RenameOrchestrator(
-        config=mock_config,
-        exclude_patterns=["*.log", "*.tmp"]
-    )
+    orch = RenameOrchestrator(config=mock_config, exclude_patterns=["*.log", "*.tmp"])
 
     processed = []
-    with patch.object(orch, '_process_single_file', side_effect=lambda f: processed.append(f)):
-        orch.process_files(str(temp_test_dir / '*'))
+    with patch.object(
+        orch, "_process_single_file", side_effect=lambda f: processed.append(f)
+    ):
+        orch.process_files(str(temp_test_dir / "*"))
 
     basenames = [os.path.basename(f) for f in processed]
     assert basenames == ["keep.txt"]
@@ -82,8 +80,10 @@ def test_hidden_files_auto_skipped(temp_test_dir, mock_config):
     orch = RenameOrchestrator(config=mock_config)
 
     processed = []
-    with patch.object(orch, '_process_single_file', side_effect=lambda f: processed.append(f)):
-        orch.process_files(str(temp_test_dir / '*'))
+    with patch.object(
+        orch, "_process_single_file", side_effect=lambda f: processed.append(f)
+    ):
+        orch.process_files(str(temp_test_dir / "*"))
 
     basenames = [os.path.basename(f) for f in processed]
     assert basenames == ["visible.txt"]
@@ -97,8 +97,10 @@ def test_zero_byte_files_auto_skipped(temp_test_dir, mock_config):
     orch = RenameOrchestrator(config=mock_config)
 
     processed = []
-    with patch.object(orch, '_process_single_file', side_effect=lambda f: processed.append(f)):
-        orch.process_files(str(temp_test_dir / '*'))
+    with patch.object(
+        orch, "_process_single_file", side_effect=lambda f: processed.append(f)
+    ):
+        orch.process_files(str(temp_test_dir / "*"))
 
     basenames = [os.path.basename(f) for f in processed]
     assert basenames == ["has_content.txt"]
@@ -113,8 +115,10 @@ def test_sort_by_name(temp_test_dir, mock_config):
     orch = RenameOrchestrator(config=mock_config, sort_order="name")
 
     processed = []
-    with patch.object(orch, '_process_single_file', side_effect=lambda f: processed.append(f)):
-        orch.process_files(str(temp_test_dir / '*'))
+    with patch.object(
+        orch, "_process_single_file", side_effect=lambda f: processed.append(f)
+    ):
+        orch.process_files(str(temp_test_dir / "*"))
 
     basenames = [os.path.basename(f) for f in processed]
     assert basenames == ["alpha.txt", "Beta.txt", "zebra.txt"]
@@ -129,8 +133,10 @@ def test_sort_by_size(temp_test_dir, mock_config):
     orch = RenameOrchestrator(config=mock_config, sort_order="size")
 
     processed = []
-    with patch.object(orch, '_process_single_file', side_effect=lambda f: processed.append(f)):
-        orch.process_files(str(temp_test_dir / '*'))
+    with patch.object(
+        orch, "_process_single_file", side_effect=lambda f: processed.append(f)
+    ):
+        orch.process_files(str(temp_test_dir / "*"))
 
     basenames = [os.path.basename(f) for f in processed]
     assert basenames == ["small.txt", "medium.txt", "large.txt"]
@@ -149,8 +155,10 @@ def test_sort_by_modified(temp_test_dir, mock_config):
     orch = RenameOrchestrator(config=mock_config, sort_order="modified")
 
     processed = []
-    with patch.object(orch, '_process_single_file', side_effect=lambda f: processed.append(f)):
-        orch.process_files(str(temp_test_dir / '*'))
+    with patch.object(
+        orch, "_process_single_file", side_effect=lambda f: processed.append(f)
+    ):
+        orch.process_files(str(temp_test_dir / "*"))
 
     basenames = [os.path.basename(f) for f in processed]
     assert basenames == ["first.txt", "second.txt", "third.txt"]
@@ -167,8 +175,10 @@ def test_non_regular_files_skipped(temp_test_dir, mock_config):
     orch = RenameOrchestrator(config=mock_config)
 
     processed = []
-    with patch.object(orch, '_process_single_file', side_effect=lambda f: processed.append(f)):
-        orch.process_files(str(temp_test_dir / '*'))
+    with patch.object(
+        orch, "_process_single_file", side_effect=lambda f: processed.append(f)
+    ):
+        orch.process_files(str(temp_test_dir / "*"))
 
     # Should only process the regular file, not the directory
     assert len(processed) == 1
@@ -184,14 +194,14 @@ def test_combined_filtering_sorting(temp_test_dir, mock_config):
     create_test_file(temp_test_dir, "empty.txt", size=0)
 
     orch = RenameOrchestrator(
-        config=mock_config,
-        exclude_patterns=["*.log"],
-        sort_order="size"
+        config=mock_config, exclude_patterns=["*.log"], sort_order="size"
     )
 
     processed = []
-    with patch.object(orch, '_process_single_file', side_effect=lambda f: processed.append(f)):
-        orch.process_files(str(temp_test_dir / '*'))
+    with patch.object(
+        orch, "_process_single_file", side_effect=lambda f: processed.append(f)
+    ):
+        orch.process_files(str(temp_test_dir / "*"))
 
     basenames = [os.path.basename(f) for f in processed]
     assert basenames == ["a_keep.txt", "c_keep.txt"]

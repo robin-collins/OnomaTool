@@ -122,7 +122,12 @@ class RenameHistory:
 
         renames = self.get_session_renames(session_id)
         if not renames:
-            return [{"status": "error", "message": f"No renames found for session {session_id}"}]
+            return [
+                {
+                    "status": "error",
+                    "message": f"No renames found for session {session_id}",
+                }
+            ]
 
         results = []
         # Undo in reverse order
@@ -131,38 +136,46 @@ class RenameHistory:
             new = rename["new_path"]
 
             if not os.path.exists(new):
-                results.append({
-                    "original_path": original,
-                    "new_path": new,
-                    "status": "warning",
-                    "message": f"File not found: {new} (may have been moved or deleted)",
-                })
+                results.append(
+                    {
+                        "original_path": original,
+                        "new_path": new,
+                        "status": "warning",
+                        "message": f"File not found: {new} (may have been moved or deleted)",
+                    }
+                )
                 continue
 
             if os.path.exists(original):
-                results.append({
-                    "original_path": original,
-                    "new_path": new,
-                    "status": "error",
-                    "message": f"Cannot undo: {original} already exists",
-                })
+                results.append(
+                    {
+                        "original_path": original,
+                        "new_path": new,
+                        "status": "error",
+                        "message": f"Cannot undo: {original} already exists",
+                    }
+                )
                 continue
 
             try:
                 os.rename(new, original)
-                results.append({
-                    "original_path": original,
-                    "new_path": new,
-                    "status": "ok",
-                    "message": f"{os.path.basename(new)} --> {os.path.basename(original)}",
-                })
+                results.append(
+                    {
+                        "original_path": original,
+                        "new_path": new,
+                        "status": "ok",
+                        "message": f"{os.path.basename(new)} --> {os.path.basename(original)}",
+                    }
+                )
             except OSError as e:
-                results.append({
-                    "original_path": original,
-                    "new_path": new,
-                    "status": "error",
-                    "message": f"Failed to undo {new}: {e}",
-                })
+                results.append(
+                    {
+                        "original_path": original,
+                        "new_path": new,
+                        "status": "error",
+                        "message": f"Failed to undo {new}: {e}",
+                    }
+                )
 
         return results
 
@@ -170,16 +183,18 @@ class RenameHistory:
         """Remove sessions older than retention_days. Returns count of pruned sessions."""
         conn = self._connect()
         cutoff = (datetime.now() - timedelta(days=retention_days)).isoformat()
-        cursor = conn.execute(
-            "SELECT id FROM sessions WHERE timestamp < ?", (cutoff,)
-        )
+        cursor = conn.execute("SELECT id FROM sessions WHERE timestamp < ?", (cutoff,))
         old_ids = [row["id"] for row in cursor.fetchall()]
         if not old_ids:
             return 0
 
         placeholders = ",".join("?" * len(old_ids))
-        conn.execute(f"DELETE FROM renames WHERE session_id IN ({placeholders})", old_ids)
+        conn.execute(
+            f"DELETE FROM renames WHERE session_id IN ({placeholders})", old_ids
+        )
         conn.execute(f"DELETE FROM sessions WHERE id IN ({placeholders})", old_ids)
         conn.commit()
-        logger.info("Pruned %d old sessions (older than %d days)", len(old_ids), retention_days)
+        logger.info(
+            "Pruned %d old sessions (older than %d days)", len(old_ids), retention_days
+        )
         return len(old_ids)

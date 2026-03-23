@@ -60,7 +60,9 @@ class FileDispatcher:
         if self._plugins:
             logger.debug("Loaded %d processor plugin(s)", len(self._plugins))
 
-    def get_processor(self, file_path: str, format_override: str | None = None) -> object:
+    def get_processor(
+        self, file_path: str, format_override: str | None = None
+    ) -> object:
         """Get appropriate processor for the given file.
 
         Built-in processors take precedence over plugins for their

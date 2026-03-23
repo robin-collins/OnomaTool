@@ -147,7 +147,11 @@ def main(args=None):
 
         # Configure logging to output to stdout for better CLI integration
         logging.basicConfig(
-            level=logging.DEBUG if verbose_level >= 2 else logging.INFO if verbose_level >= 1 else logging.WARNING,
+            level=logging.DEBUG
+            if verbose_level >= 2
+            else logging.INFO
+            if verbose_level >= 1
+            else logging.WARNING,
             format="[%(levelname)s] %(message)s",
             stream=sys.stdout,
         )
@@ -174,8 +178,12 @@ def main(args=None):
             if changes:
                 print("\nNote: Some names changed since dry-run preview:")
                 for file_path, dry_name, actual_name in changes:
-                    print(f"  {os.path.basename(file_path)}: {dry_name} -> {actual_name}")
-                confirm = input("\nProceed with updated renames? [y/N]: ").strip().lower()
+                    print(
+                        f"  {os.path.basename(file_path)}: {dry_name} -> {actual_name}"
+                    )
+                confirm = (
+                    input("\nProceed with updated renames? [y/N]: ").strip().lower()
+                )
             else:
                 confirm = input("\nProceed with these renames? [y/N]: ").strip().lower()
             if confirm == "y":
@@ -228,7 +236,9 @@ def _handle_history() -> int:
     print(f"{'ID':>6}  {'Timestamp':25s}  {'Files':>5}  {'Directory'}")
     print("-" * 70)
     for s in sessions:
-        print(f"{s['id']:>6}  {s['timestamp']:25s}  {s['file_count']:>5}  {s['working_dir']}")
+        print(
+            f"{s['id']:>6}  {s['timestamp']:25s}  {s['file_count']:>5}  {s['working_dir']}"
+        )
     return 0
 
 
@@ -273,7 +283,9 @@ def run_health_check() -> int:
                     text=True,
                     timeout=5,
                 )
-                version = result.stdout.split("\n")[0][:50] if result.stdout else "found"
+                version = (
+                    result.stdout.split("\n")[0][:50] if result.stdout else "found"
+                )
             except Exception:
                 version = "found"
             checks.append((tool, version, True))

@@ -25,9 +25,7 @@ from onomatool.config import (
 @pytest.fixture
 def temp_config_file():
     """Create a temporary config file for testing."""
-    with tempfile.NamedTemporaryFile(
-        mode="wb", suffix=".toml", delete=False
-    ) as tmp:
+    with tempfile.NamedTemporaryFile(mode="wb", suffix=".toml", delete=False) as tmp:
         yield Path(tmp.name)
     # Cleanup
     Path(tmp.name).unlink(missing_ok=True)

@@ -11,10 +11,10 @@ def test_clean_filename_unchanged():
 
 def test_windows_illegal_chars_replaced():
     """Windows-illegal characters are replaced with underscore."""
-    assert sanitize_filename('file<name>.txt') == "file_name_.txt"
-    assert sanitize_filename('file:name') == "file_name"
-    assert sanitize_filename('path/to\\file') == "path_to_file"
-    assert sanitize_filename('what?*') == "what__"
+    assert sanitize_filename("file<name>.txt") == "file_name_.txt"
+    assert sanitize_filename("file:name") == "file_name"
+    assert sanitize_filename("path/to\\file") == "path_to_file"
+    assert sanitize_filename("what?*") == "what__"
 
 
 def test_reserved_names_prefixed():

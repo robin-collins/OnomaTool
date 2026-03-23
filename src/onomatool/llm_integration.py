@@ -93,12 +93,12 @@ class OpenAIProvider:
         if use_azure:
             from openai import AzureOpenAI
 
-            azure_endpoint = self.config.get(
-                "azure_openai_endpoint"
-            ) or os.environ.get("AZURE_OPENAI_ENDPOINT")
-            azure_api_key = self.config.get(
-                "azure_openai_api_key"
-            ) or os.environ.get("AZURE_OPENAI_API_KEY")
+            azure_endpoint = self.config.get("azure_openai_endpoint") or os.environ.get(
+                "AZURE_OPENAI_ENDPOINT"
+            )
+            azure_api_key = self.config.get("azure_openai_api_key") or os.environ.get(
+                "AZURE_OPENAI_API_KEY"
+            )
             azure_api_version = self.config.get(
                 "azure_openai_api_version", "2024-02-01"
             )
@@ -144,15 +144,16 @@ class OpenAIProvider:
             if use_azure:
                 logger.debug("Using Azure OpenAI")
                 logger.debug(
-                    "Azure endpoint: %s", self.config.get('azure_openai_endpoint')
+                    "Azure endpoint: %s", self.config.get("azure_openai_endpoint")
                 )
                 logger.debug(
-                    "Azure deployment: %s", self.config.get('azure_openai_deployment')
+                    "Azure deployment: %s", self.config.get("azure_openai_deployment")
                 )
             else:
                 logger.debug("Using OpenAI")
                 logger.debug(
-                    "Base URL: %s", self.config.get('openai_base_url', 'https://api.openai.com/v1')
+                    "Base URL: %s",
+                    self.config.get("openai_base_url", "https://api.openai.com/v1"),
                 )
             logger.debug("Model: %s", model)
             logger.debug("Pydantic Model: %s", pydantic_model.__name__)
@@ -252,7 +253,11 @@ class GoogleProvider:
                                 user_prompt = item.get("text", "")
                             elif item.get("type") == "image_url":
                                 image_url_data = item.get("image_url", {})
-                                url = image_url_data.get("url", "") if isinstance(image_url_data, dict) else image_url_data
+                                url = (
+                                    image_url_data.get("url", "")
+                                    if isinstance(image_url_data, dict)
+                                    else image_url_data
+                                )
                                 if url.startswith("data:"):
                                     # Parse data URI: data:<mime>;base64,<data>
                                     header, b64_data = url.split(",", 1)
@@ -385,7 +390,7 @@ def _call_provider_with_retry(
             last_error = err
             if not _is_transient_error(err) or attempt >= max_retries:
                 raise
-            delay = retry_delay * (2 ** attempt)
+            delay = retry_delay * (2**attempt)
             logger.warning(
                 "LLM call failed (attempt %d/%d): %s — retrying in %.1fs",
                 attempt + 1,
@@ -451,7 +456,9 @@ def get_suggestions(
     truncated_content = content[:MAX_CONTENT_CHARS]
     if len(content) > MAX_CONTENT_CHARS and verbose_level > 0:
         logger.debug(
-            "Content truncated from %s to %s characters", len(content), MAX_CONTENT_CHARS
+            "Content truncated from %s to %s characters",
+            len(content),
+            MAX_CONTENT_CHARS,
         )
 
     # Detect image files
@@ -511,8 +518,14 @@ def get_suggestions(
 
     try:
         result = _call_provider_with_retry(
-            provider, messages, pydantic_model, json_schema, model,
-            verbose_level, max_retries, retry_delay,
+            provider,
+            messages,
+            pydantic_model,
+            json_schema,
+            model,
+            verbose_level,
+            max_retries,
+            retry_delay,
         )
         return result
     except Exception as err:
@@ -561,9 +574,7 @@ def _log_verbose_request(
     if redact_text:
         logger.debug("Text content redacted as [[file_content]]")
     else:
-        logger.debug(
-            "Image content - text not redacted, base64 images redacted"
-        )
+        logger.debug("Image content - text not redacted, base64 images redacted")
 
 
 def _redact_messages(messages: list, redact_text: bool = True) -> list:

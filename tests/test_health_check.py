@@ -61,7 +61,9 @@ class TestHealthCheck:
         ]
 
         for package in expected_packages:
-            assert package in captured.out, f"Package {package} not found in health check output"
+            assert package in captured.out, (
+                f"Package {package} not found in health check output"
+            )
 
     def test_health_check_shows_system_tools(self, capsys):
         """Health check output contains system tool names."""
@@ -104,7 +106,8 @@ class TestHealthCheck:
         # Each line (except summary) should follow format:
         # "  package_name    version    [STATUS]"
         non_summary_lines = [
-            line for line in lines
+            line
+            for line in lines
             if not line.startswith("\n") and "dependencies" not in line.lower()
         ]
 

@@ -77,7 +77,9 @@ class TestFormatOverride:
         extensions = [".txt", ".md", ".json", ".csv", ".py"]
         for ext in extensions:
             processor = dispatcher.get_processor(f"test{ext}", format_override="pdf")
-            assert isinstance(processor, MarkitdownProcessor), f"Failed for extension {ext}"
+            assert isinstance(processor, MarkitdownProcessor), (
+                f"Failed for extension {ext}"
+            )
 
     def test_format_override_takes_precedence_over_extension(self, dispatcher):
         """format_override always takes precedence over file extension."""
@@ -101,4 +103,6 @@ class TestFormatOverride:
         non_text_extensions = [".pdf", ".docx", ".pptx", ".jpg", ".png"]
         for ext in non_text_extensions:
             processor = dispatcher.get_processor(f"test{ext}")
-            assert isinstance(processor, MarkitdownProcessor), f"Failed for extension {ext}"
+            assert isinstance(processor, MarkitdownProcessor), (
+                f"Failed for extension {ext}"
+            )

@@ -211,7 +211,9 @@ def test_continue_on_error_remaining_files_process(mock_config, work_dir, capsys
 def test_svg_conversion_failure_increments_failed_count(mock_config, work_dir, capsys):
     """Test that SVG conversion failure increments failed_count."""
     svg_file = work_dir / "test.svg"
-    svg_file.write_text('<svg xmlns="http://www.w3.org/2000/svg"><rect width="100" height="100"/></svg>')
+    svg_file.write_text(
+        '<svg xmlns="http://www.w3.org/2000/svg"><rect width="100" height="100"/></svg>'
+    )
 
     orchestrator = RenameOrchestrator(mock_config, dry_run=True)
 

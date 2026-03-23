@@ -6,11 +6,16 @@ import re
 WINDOWS_ILLEGAL_CHARS = re.compile(r'[<>:"/\\|?*]')
 
 # Windows reserved names (case-insensitive)
-WINDOWS_RESERVED_NAMES = frozenset({
-    "CON", "PRN", "AUX", "NUL",
-    *(f"COM{i}" for i in range(1, 10)),
-    *(f"LPT{i}" for i in range(1, 10)),
-})
+WINDOWS_RESERVED_NAMES = frozenset(
+    {
+        "CON",
+        "PRN",
+        "AUX",
+        "NUL",
+        *(f"COM{i}" for i in range(1, 10)),
+        *(f"LPT{i}" for i in range(1, 10)),
+    }
+)
 
 # Maximum filename length in bytes (ext4, NTFS, APFS all use 255)
 MAX_FILENAME_BYTES = 255

@@ -125,7 +125,9 @@ class TestDebugDirectory:
                 old_dir = os.path.join(temp_debug_dir, f"old_session_{i}")
                 assert not os.path.exists(old_dir)
 
-    def test_multiple_sessions_create_separate_directories(self, temp_debug_dir, config):
+    def test_multiple_sessions_create_separate_directories(
+        self, temp_debug_dir, config
+    ):
         """Multiple debug sessions create separate timestamp-based directories."""
         with patch("onomatool.rename_orchestrator.DEBUG_DIR", temp_debug_dir):
             orchestrator1 = RenameOrchestrator(config, debug=True)
@@ -198,6 +200,7 @@ class TestDebugDirectory:
     def test_debug_dir_uses_expanduser(self, config):
         """DEBUG_DIR uses os.path.expanduser for ~ expansion."""
         from onomatool.rename_orchestrator import DEBUG_DIR
+
         # Should not contain literal "~"
         assert "~" not in DEBUG_DIR
         # Should be absolute path

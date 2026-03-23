@@ -50,14 +50,14 @@ def test_verbose_sets_info_level(temp_copy, caplog):
     """TC-LOG-002: Run with -v, check logging is configured for INFO level."""
     # Mock provider won't generate logs, so we test by checking that
     # logging.basicConfig was called with INFO level
-    with patch('logging.basicConfig') as mock_basic_config:
+    with patch("logging.basicConfig") as mock_basic_config:
         result = main([temp_copy, "--config", MOCK_CONFIG, "--verbose"])
         assert result == 0
 
         # Verify basicConfig was called with INFO level
         mock_basic_config.assert_called_once()
         call_kwargs = mock_basic_config.call_args[1]
-        assert call_kwargs['level'] == logging.INFO, (
+        assert call_kwargs["level"] == logging.INFO, (
             f"Expected INFO level, got {call_kwargs['level']}"
         )
 
@@ -67,14 +67,14 @@ def test_very_verbose_sets_debug_level(temp_copy, caplog):
     """TC-LOG-003: Run with -vv, check logging is configured for DEBUG level."""
     # Mock provider won't generate logs, so we test by checking that
     # logging.basicConfig was called with DEBUG level
-    with patch('logging.basicConfig') as mock_basic_config:
+    with patch("logging.basicConfig") as mock_basic_config:
         result = main([temp_copy, "--config", MOCK_CONFIG, "--very-verbose"])
         assert result == 0
 
         # Verify basicConfig was called with DEBUG level
         mock_basic_config.assert_called_once()
         call_kwargs = mock_basic_config.call_args[1]
-        assert call_kwargs['level'] == logging.DEBUG, (
+        assert call_kwargs["level"] == logging.DEBUG, (
             f"Expected DEBUG level, got {call_kwargs['level']}"
         )
 
@@ -130,6 +130,7 @@ def test_api_keys_not_in_log_output(temp_copy, caplog):
             )
     finally:
         import os
+
         os.unlink(temp_config)
 
 
@@ -173,7 +174,10 @@ def test_redact_messages_with_text_redaction():
         {
             "role": "user",
             "content": [
-                {"type": "text", "text": "This is sensitive file content that should be redacted."},
+                {
+                    "type": "text",
+                    "text": "This is sensitive file content that should be redacted.",
+                },
             ],
         },
     ]
@@ -218,9 +222,9 @@ def test_verbose_logging_output_format(temp_copy, caplog):
         for record in caplog.records:
             # All our logs should come from onomatool modules
             if record.levelno >= logging.INFO:
-                assert record.name.startswith("onomatool.") or record.name == "onomatool", (
-                    f"Unexpected logger name: {record.name}"
-                )
+                assert (
+                    record.name.startswith("onomatool.") or record.name == "onomatool"
+                ), f"Unexpected logger name: {record.name}"
 
 
 def test_no_info_debug_without_verbose(temp_copy, capsys):

@@ -36,12 +36,16 @@ def test_session_creation_and_recording(history, temp_db):
     conn = sqlite3.connect(temp_db)
     conn.row_factory = sqlite3.Row
 
-    session = conn.execute("SELECT * FROM sessions WHERE id = ?", (session_id,)).fetchone()
+    session = conn.execute(
+        "SELECT * FROM sessions WHERE id = ?", (session_id,)
+    ).fetchone()
     assert session is not None
     assert session["working_dir"] == "/test/dir"
     assert session["file_count"] == 1
 
-    renames = conn.execute("SELECT * FROM renames WHERE session_id = ?", (session_id,)).fetchall()
+    renames = conn.execute(
+        "SELECT * FROM renames WHERE session_id = ?", (session_id,)
+    ).fetchall()
     assert len(renames) == 1
     assert renames[0]["original_path"] == "/test/old.txt"
     assert renames[0]["new_path"] == "/test/new.txt"
@@ -197,12 +201,12 @@ def test_auto_prune_old_sessions(temp_db):
     conn = history._connect()
     cursor = conn.execute(
         "INSERT INTO sessions (timestamp, working_dir, file_count) VALUES (?, ?, ?)",
-        (old_timestamp, "/test", 1)
+        (old_timestamp, "/test", 1),
     )
     old_session_id = cursor.lastrowid
     conn.execute(
         "INSERT INTO renames (session_id, original_path, new_path, timestamp, status) VALUES (?, ?, ?, ?, ?)",
-        (old_session_id, "/old.txt", "/new.txt", old_timestamp, "ok")
+        (old_session_id, "/old.txt", "/new.txt", old_timestamp, "ok"),
     )
     conn.commit()
 
