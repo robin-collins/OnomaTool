@@ -178,39 +178,39 @@ def main(args=None):
         )
 
         config = get_config(args.config)
-        history = RenameHistory()
-        history.prune(config.get("history_retention_days", 90))
-        orchestrator = RenameOrchestrator(
-            config=config,
-            dry_run=args.dry_run,
-            debug=args.debug,
-            verbose_level=verbose_level,
-            exclude_patterns=args.exclude,
-            history=history,
-            sort_order=sort_order,
-            format_override=format_override,
-        )
+        with RenameHistory() as history:
+            history.prune(config.get("history_retention_days", 90))
+            orchestrator = RenameOrchestrator(
+                config=config,
+                dry_run=args.dry_run,
+                debug=args.debug,
+                verbose_level=verbose_level,
+                exclude_patterns=args.exclude,
+                history=history,
+                sort_order=sort_order,
+                format_override=format_override,
+            )
 
-        orchestrator.process_files(args.pattern)
+            orchestrator.process_files(args.pattern)
 
-        if args.dry_run and args.interactive and orchestrator.planned_renames:
-            # Check if re-resolved names differ from dry-run preview
-            changes = orchestrator.check_planned_renames()
-            if changes:
-                print("\nNote: Some names changed since dry-run preview:")
-                for file_path, dry_name, actual_name in changes:
-                    print(
-                        f"  {os.path.basename(file_path)}: {dry_name} -> {actual_name}"
+            if args.dry_run and args.interactive and orchestrator.planned_renames:
+                # Check if re-resolved names differ from dry-run preview
+                changes = orchestrator.check_planned_renames()
+                if changes:
+                    print("\nNote: Some names changed since dry-run preview:")
+                    for file_path, dry_name, actual_name in changes:
+                        print(
+                            f"  {os.path.basename(file_path)}: {dry_name} -> {actual_name}"
+                        )
+                    confirm = (
+                        input("\nProceed with updated renames? [y/N]: ").strip().lower()
                     )
-                confirm = (
-                    input("\nProceed with updated renames? [y/N]: ").strip().lower()
-                )
-            else:
-                confirm = input("\nProceed with these renames? [y/N]: ").strip().lower()
-            if confirm == "y":
-                orchestrator.execute_planned_renames()
-            else:
-                print("Aborted. No files were renamed.")
+                else:
+                    confirm = input("\nProceed with these renames? [y/N]: ").strip().lower()
+                if confirm == "y":
+                    orchestrator.execute_planned_renames()
+                else:
+                    print("Aborted. No files were renamed.")
     except KeyboardInterrupt:
         print("\nOperation cancelled by user (Ctrl+C). Exiting gracefully.")
         return 130

@@ -40,6 +40,12 @@ class RenameHistory:
         self.db_path = db_path or DEFAULT_DB_PATH
         self._conn: sqlite3.Connection | None = None
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self.close()
+
     def _connect(self) -> sqlite3.Connection:
         if self._conn is None:
             self._conn = sqlite3.connect(self.db_path)
@@ -130,7 +136,15 @@ class RenameHistory:
             ]
 
         results = []
-        # Undo in reverse order
+        # Undo in reverse order, only for successful renames
+        renames = [r for r in renames if r.get("status") == "ok"]
+        if not renames:
+            return [
+                {
+                    "status": "error",
+                    "message": f"No successful renames found for session {session_id}",
+                }
+            ]
         for rename in reversed(renames):
             original = rename["original_path"]
             new = rename["new_path"]

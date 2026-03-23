@@ -16,7 +16,6 @@ from onomatool.file_collector import collect_files
 from onomatool.file_dispatcher import FileDispatcher
 from onomatool.history import RenameHistory
 from onomatool.models import ProcessingResult
-from onomatool.renamer import rename_file
 from onomatool.sanitizer import sanitize_filename
 from onomatool.suggestion_strategy import select_strategy
 from onomatool.utils.image_utils import convert_svg_to_png
@@ -258,7 +257,7 @@ class RenameOrchestrator:
             return None, None
 
     def _execute_rename(self, file_path: str, new_name: str) -> None:
-        """Sanitize, resolve conflicts, and rename (or plan rename in dry-run)."""
+        """Sanitize, resolve conflicts once, and rename (or plan rename in dry-run)."""
         new_name = sanitize_filename(new_name)
         directory = os.path.dirname(file_path) or "."
         _, ext = os.path.splitext(file_path)
@@ -275,7 +274,7 @@ class RenameOrchestrator:
             else:
                 new_path = os.path.join(directory, final_name)
                 print(f"{os.path.basename(file_path)} --> {final_name}")
-                rename_file(file_path, new_name)
+                shutil.move(file_path, new_path)
                 if self.history and self._session_id is not None:
                     self.history.record_rename(self._session_id, file_path, new_path)
 
@@ -314,7 +313,7 @@ class RenameOrchestrator:
             final_name = resolve_conflict(new_name_with_ext, existing_files)
             new_path = os.path.join(directory, final_name)
             print(f"{os.path.basename(file_path)} --> {final_name}")
-            rename_file(file_path, new_name)
+            shutil.move(file_path, new_path)
             if self.history and self._session_id is not None:
                 self.history.record_rename(self._session_id, file_path, new_path)
 

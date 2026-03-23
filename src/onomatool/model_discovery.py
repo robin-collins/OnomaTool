@@ -181,10 +181,10 @@ def list_models_google(config: dict) -> list[ModelInfo]:
         )
 
     url = "https://generativelanguage.googleapis.com/v1beta/models"
-    params = {"key": api_key}
+    headers = {"x-goog-api-key": api_key}
 
     try:
-        resp = httpx.get(url, params=params, timeout=10.0)
+        resp = httpx.get(url, headers=headers, timeout=10.0)
         resp.raise_for_status()
         data = resp.json()
     except Exception as e:

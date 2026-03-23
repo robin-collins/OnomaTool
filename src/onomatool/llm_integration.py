@@ -4,6 +4,7 @@ import logging
 import mimetypes
 import os
 import re
+import threading
 import time
 from typing import Protocol
 
@@ -21,8 +22,9 @@ from onomatool.prompts import get_image_prompt, get_system_prompt, get_user_prom
 # Maximum tokens for LLM response - limits response to 100 tokens
 MAX_TOKENS = 100
 
-# Track last API call time for rate limiting
+# Track last API call time for rate limiting (protected by _rate_limit_lock)
 _last_call_time: float = 0.0
+_rate_limit_lock = threading.Lock()
 
 # Maximum characters to send to LLM (approx 65,535 tokens)
 MAX_CONTENT_CHARS = 120_000
@@ -120,9 +122,9 @@ class OpenAIProvider:
 
         base_url = self.config.get("openai_base_url", "https://api.openai.com/v1")
         api_key = self.config.get("openai_api_key") or os.environ.get("OPENAI_API_KEY")
-        verify = not base_url.startswith(
-            ("http://", "https://10.", "https://127.", "https://localhost")
-        )
+        verify = not self.config.get("allow_insecure_transport", False)
+        if not verify:
+            logger.warning("SSL verification disabled via allow_insecure_transport config")
         return OpenAI(
             base_url=base_url,
             api_key=api_key,
@@ -192,6 +194,10 @@ class OpenAIProvider:
                 max_tokens=MAX_TOKENS,
             )
             result = json.loads(response.choices[0].message.content)
+            if not isinstance(result, dict) or "suggestions" not in result:
+                raise RuntimeError(
+                    "LLM JSON response missing 'suggestions' key."
+                ) from None
             suggestions = result["suggestions"]
 
             if verbose_level > 0:
@@ -337,13 +343,15 @@ def _apply_rate_limit(delay: float, verbose_level: int = 0) -> None:
     global _last_call_time
     if delay <= 0:
         return
-    now = time.monotonic()
-    elapsed = now - _last_call_time
-    if _last_call_time > 0 and elapsed < delay:
-        wait = delay - elapsed
-        if verbose_level > 0:
-            logger.debug("Rate limit: waiting %.2fs before next API call", wait)
-        time.sleep(wait)
+    with _rate_limit_lock:
+        now = time.monotonic()
+        elapsed = now - _last_call_time
+        if _last_call_time > 0 and elapsed < delay:
+            wait = delay - elapsed
+            if verbose_level > 0:
+                logger.debug("Rate limit: waiting %.2fs before next API call", wait)
+            time.sleep(wait)
+        _last_call_time = time.monotonic()
 
 
 def _is_transient_error(err: Exception) -> bool:
@@ -513,7 +521,6 @@ def get_suggestions(
     rate_limit_delay = config.get("rate_limit_delay", 0.0)
 
     # Apply rate limiting between consecutive API calls
-    global _last_call_time
     _apply_rate_limit(rate_limit_delay, verbose_level)
 
     try:
@@ -531,8 +538,6 @@ def get_suggestions(
     except Exception as err:
         provider_name = config.get("default_provider", "openai")
         raise RuntimeError(f"{provider_name} LLM call failed: {err}") from err
-    finally:
-        _last_call_time = time.monotonic()
 
 
 def _log_verbose_request(

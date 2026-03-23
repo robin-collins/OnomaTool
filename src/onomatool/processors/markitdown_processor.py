@@ -1,9 +1,11 @@
-import glob
+import logging
 import os
 import subprocess
 import tempfile
 
 import chardet
+
+logger = logging.getLogger(__name__)
 from markitdown import MarkItDown
 
 from onomatool.models import ProcessingResult
@@ -23,10 +25,6 @@ try:
     import cairosvg
 except ImportError:
     cairosvg = None
-try:
-    import requests
-except ImportError:
-    requests = None
 
 
 class MarkitdownProcessor:
@@ -94,9 +92,8 @@ class MarkitdownProcessor:
 
                 return encoding
 
-        except Exception:
-            if self.debug:
-                pass
+        except Exception as e:
+            logger.warning("Encoding detection failed for %s: %s", file_path, e)
             return "utf-8"
 
     def ensure_utf8_file(self, file_path: str) -> str:
@@ -168,9 +165,8 @@ class MarkitdownProcessor:
 
             return temp_path
 
-        except Exception:
-            if self.debug:
-                pass
+        except Exception as e:
+            logger.warning("UTF-8 conversion failed for %s: %s", file_path, e)
             # Clean up temp file if it was created
             try:
                 if "temp_path" in locals():
@@ -190,11 +186,8 @@ class MarkitdownProcessor:
         if temp_path != original_path:
             try:
                 os.unlink(temp_path)
-                if self.debug:
-                    pass
-            except Exception:
-                if self.debug:
-                    pass
+            except Exception as e:
+                logger.warning("Failed to clean up temp file %s: %s", temp_path, e)
 
     def process(self, file_path: str) -> ProcessingResult | None:
         """
@@ -258,9 +251,8 @@ class MarkitdownProcessor:
                         if self.debug:
                             pass
 
-                    except Exception:
-                        if self.debug:
-                            pass
+                    except Exception as e:
+                        logger.error("Fallback text read failed for %s: %s", file_path, e)
                         raise conversion_error from None
                 else:
                     # Not a Unicode error or not a text file, re-raise the original error
@@ -324,35 +316,25 @@ class MarkitdownProcessor:
                         tempdir.name,
                     ]
                     soffice_result = subprocess.run(
-                        soffice_cmd, capture_output=True, text=True
+                        soffice_cmd, capture_output=True, text=True, timeout=60
                     )
                     if soffice_result.returncode != 0 or not os.path.exists(pdf_path):
                         return None
-                    # Step 2: Convert PDF to JPEGs
-                    output_pattern = os.path.join(tempdir.name, f"{basename}-%d.jpeg")
-                    convert_cmd = [
-                        "convert",
-                        "-adaptive-resize",
-                        "x1024",
-                        "-density",
-                        "150",
-                        pdf_path,
-                        "-quality",
-                        "80",
-                        output_pattern,
-                    ]
-                    convert_result = subprocess.run(
-                        convert_cmd, capture_output=True, text=True
-                    )
-                    if convert_result.returncode != 0:
+                    # Step 2: Convert PDF pages to PNGs using PyMuPDF
+                    if fitz is None:
                         return None
-                    # Step 3: Collect images
-                    jpeg_files = sorted(
-                        glob.glob(os.path.join(tempdir.name, f"{basename}-*.jpeg"))
-                    )
-                    if not jpeg_files:
+                    doc = fitz.open(pdf_path)
+                    for page_num in range(len(doc)):
+                        page = doc.load_page(page_num)
+                        pix = page.get_pixmap()
+                        img_path = os.path.join(
+                            tempdir.name, f"{basename}_{page_num + 1}.png"
+                        )
+                        pix.save(img_path)
+                        images.append(img_path)
+                    doc.close()
+                    if not images:
                         return None
-                    images.extend(jpeg_files)
 
                     # Save markdown content to file in debug mode
                     if self.debug:
@@ -369,7 +351,8 @@ class MarkitdownProcessor:
                         source_path=file_path,
                         file_type="pptx",
                     )
-                except Exception:
+                except Exception as e:
+                    logger.error("PPTX slide image extraction failed for %s: %s", file_path, e)
                     return None
             elif ext == ".svg":
                 # No conversion here; handled elsewhere
@@ -416,9 +399,11 @@ class MarkitdownProcessor:
                     file_type=file_ext,
                 )
 
-        except UnicodeDecodeError:
+        except UnicodeDecodeError as e:
+            logger.error("Unicode decode error processing %s: %s", file_path, e)
             return None
-        except Exception:
+        except Exception as e:
+            logger.error("Failed to process %s: %s", file_path, e)
             return None
         finally:
             # Clean up temporary UTF-8 file if created

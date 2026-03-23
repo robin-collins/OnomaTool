@@ -55,6 +55,7 @@ class OnomatoolConfig(BaseModel):
     rate_limit_delay: float = Field(default=0.0, ge=0.0, le=60.0)
     history_retention_days: int = Field(default=90, ge=1, le=3650)
     concurrency: int = Field(default=1, ge=1, le=32)
+    allow_insecure_transport: bool = False
     extra_processors: list[str] = Field(default_factory=list)
     markitdown: MarkitdownConfig = MarkitdownConfig()
 
@@ -99,8 +100,8 @@ def get_config(config_path: str | None = None) -> dict[str, Any]:
             return result
         except ValidationError as e:
             logger.warning("Configuration validation error: %s", e)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Failed to load config from %s: %s", config_path, e)
     return DEFAULT_CONFIG.copy()
 
 

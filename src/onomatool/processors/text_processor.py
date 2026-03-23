@@ -1,8 +1,11 @@
+import logging
 import os
 import tempfile
 from pathlib import Path
 
 import chardet
+
+logger = logging.getLogger(__name__)
 
 from onomatool.models import ProcessingResult
 
@@ -131,7 +134,8 @@ class TextProcessor:
                 file_type=ext or "txt",
             )
 
-        except Exception:
+        except Exception as e:
+            logger.error("Failed to process text file %s: %s", file_path, e)
             # Clean up temp file if created
             if utf8_file_path and utf8_file_path != file_path:
                 self.cleanup_temp_encoding_file(file_path, utf8_file_path)
