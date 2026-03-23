@@ -15,15 +15,28 @@ def get_system_prompt(config=None) -> str:
 def get_user_prompt(naming_convention: str, content: str, config=None) -> str:
     if config is None:
         config = get_config()
+    min_words = config.get("min_filename_words", 5)
+    max_words = config.get("max_filename_words", 15)
     template = config.get("user_prompt") or DEFAULT_USER_PROMPT
-    return template.format(naming_convention=naming_convention, content=content)
+    return template.format(
+        naming_convention=naming_convention,
+        content=content,
+        min_words=min_words,
+        max_words=max_words,
+    )
 
 
 def get_image_prompt(naming_convention: str, config=None) -> str:
     if config is None:
         config = get_config()
+    min_words = config.get("min_filename_words", 5)
+    max_words = config.get("max_filename_words", 15)
     template = config.get("image_prompt") or DEFAULT_IMAGE_PROMPT
-    return template.format(naming_convention=naming_convention)
+    return template.format(
+        naming_convention=naming_convention,
+        min_words=min_words,
+        max_words=max_words,
+    )
 
 
 DEFAULT_SYSTEM_PROMPT = (
@@ -35,7 +48,7 @@ DEFAULT_USER_PROMPT = (
     "provided file content, following a specific naming convention. Only return the suggestions "
     "as specified in the JSON schema. When providing suggestions consider the who, what, when, "
     "where, why, and how of the file content, its purpose or inteded use. A good file name should "
-    "be concise, descriptive, and easy to understand and be between five and ten words in length. "
+    "be concise, descriptive, and easy to understand and be between {min_words} and {max_words} words in length. "
     "Take note of indicators of the file content, such as the who, what, where, when, why, and "
     "how, and other relevant information like chat transcripts, source code bundles, file lists "
     "or file tree's. Avoid assumptions unless other indicators are ambiguous or not present."
@@ -69,7 +82,7 @@ DEFAULT_IMAGE_PROMPT = (
     "model numbers, or specific item identifiers\n- Dates, timestamps, or other temporal information visible "
     "in the image\n\n## File Naming Criteria:\n\n1. Prioritize specific identifiers when clearly visible "
     "(brands, locations, applications, products)\n2. Be descriptive about visual content and context\n3. "
-    "Include relevant details (setting, activity, style, technical type)\n4. Be between five and ten words "
+    "Include relevant details (setting, activity, style, technical type)\n4. Be between {min_words} and {max_words} words "
     "in length\n5. Consider the who, what, when, where, why, and how of the visual content\n6. Use clear, "
     "descriptive terminology\n7. Balance specificity with broad applicability\n8. **IMPORTANT**: When "
     "including numbers (dates, times, model numbers, IDs), keep digit sequences reasonable - use formats "
