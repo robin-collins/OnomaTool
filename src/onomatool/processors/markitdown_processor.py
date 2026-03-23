@@ -2,10 +2,11 @@ import glob
 import os
 import subprocess
 import tempfile
-from typing import Any
 
 import chardet
 from markitdown import MarkItDown
+
+from onomatool.models import ProcessingResult
 
 try:
     import fitz  # PyMuPDF
@@ -195,7 +196,7 @@ class MarkitdownProcessor:
                 if self.debug:
                     pass
 
-    def process(self, file_path: str) -> Any | None:
+    def process(self, file_path: str) -> ProcessingResult | None:
         """
         Process a file using markitdown library with proper UTF-8 encoding handling.
         For PDFs, also generate images for each page.
@@ -292,11 +293,13 @@ class MarkitdownProcessor:
                     with open(markdown_path, "w", encoding="utf-8") as f:
                         f.write(result.text_content)
 
-                return {
-                    "markdown": result.text_content,
-                    "images": images,
-                    "tempdir": tempdir,
-                }
+                return ProcessingResult(
+                    markdown=result.text_content,
+                    images=images,
+                    tempdir=tempdir,
+                    source_path=file_path,
+                    file_type="pdf",
+                )
             if ext == ".pptx":
                 images = []
                 if self.debug:
@@ -359,11 +362,13 @@ class MarkitdownProcessor:
                         with open(markdown_path, "w", encoding="utf-8") as f:
                             f.write(result.text_content)
 
-                    return {
-                        "markdown": result.text_content,
-                        "images": images,
-                        "tempdir": tempdir,
-                    }
+                    return ProcessingResult(
+                        markdown=result.text_content,
+                        images=images,
+                        tempdir=tempdir,
+                        source_path=file_path,
+                        file_type="pptx",
+                    )
                 except Exception:
                     return None
             elif ext == ".svg":
@@ -377,15 +382,21 @@ class MarkitdownProcessor:
                     markdown_path = os.path.join(tempdir.name, "extracted_content.md")
                     with open(markdown_path, "w", encoding="utf-8") as f:
                         f.write(result.text_content)
-                    return {
-                        "markdown": result.text_content,
-                        "tempdir": tempdir,
-                    }
-                return result.text_content
+                    return ProcessingResult(
+                        markdown=result.text_content,
+                        tempdir=tempdir,
+                        source_path=file_path,
+                        file_type="svg",
+                    )
+                return ProcessingResult(
+                    markdown=result.text_content,
+                    source_path=file_path,
+                    file_type="svg",
+                )
             else:
+                file_ext = ext.lstrip(".")
                 # For all other file types (docx, txt, etc.), save markdown in debug mode
                 if self.debug and result.text_content:
-                    file_ext = ext.lstrip(".")
                     tempdir_path = tempfile.mkdtemp(prefix=f"onoma_{file_ext}_")
                     tempdir = type(
                         "TempDir", (), {"name": tempdir_path, "cleanup": lambda: None}
@@ -393,11 +404,17 @@ class MarkitdownProcessor:
                     markdown_path = os.path.join(tempdir.name, "extracted_content.md")
                     with open(markdown_path, "w", encoding="utf-8") as f:
                         f.write(result.text_content)
-                    return {
-                        "markdown": result.text_content,
-                        "tempdir": tempdir,
-                    }
-                return result.text_content
+                    return ProcessingResult(
+                        markdown=result.text_content,
+                        tempdir=tempdir,
+                        source_path=file_path,
+                        file_type=file_ext,
+                    )
+                return ProcessingResult(
+                    markdown=result.text_content,
+                    source_path=file_path,
+                    file_type=file_ext,
+                )
 
         except UnicodeDecodeError:
             return None

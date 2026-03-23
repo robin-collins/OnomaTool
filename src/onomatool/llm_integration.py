@@ -351,21 +351,17 @@ def get_suggestions(
             raise RuntimeError(f"OpenAI LLM call failed: {err}") from err
     elif provider == "google":
         try:
-            import google.generativeai as genai
+            from google import genai
+            from google.genai import types
 
-            genai.configure(
-                api_key=config.get("google_api_key") or os.environ.get("GOOGLE_API_KEY")
-            )
-            model_name = "gemini-pro"
-            model = genai.GenerativeModel(model_name)
+            api_key = config.get("google_api_key") or os.environ.get("GOOGLE_API_KEY")
+            client = genai.Client(api_key=api_key)
 
-            # Configure generation settings with max_output_tokens
-            generation_config = genai.types.GenerationConfig(
-                max_output_tokens=MAX_TOKENS
-            )
+            if verbose_level > 0:
+                print("[DEBUG] Using Google Gemini")
+                print(f"[DEBUG] Model: {model}")
 
             if verbose_level > 1:
-                # Calculate character and token counts for Google request
                 total_chars = len(user_prompt)
                 total_tokens = count_text_tokens(
                     user_prompt, "gpt-4o"
@@ -373,9 +369,14 @@ def get_suggestions(
                 print(f"[DEBUG] Total characters in request: {total_chars}")
                 print(f"[DEBUG] Estimated tokens: {total_tokens}")
 
-            response = model.generate_content(
-                user_prompt, generation_config=generation_config
+            response = client.models.generate_content(
+                model=model,
+                contents=user_prompt,
+                config=types.GenerateContentConfig(
+                    max_output_tokens=MAX_TOKENS,
+                ),
             )
+
             import re
 
             suggestions = re.findall(r'"([a-zA-Z0-9_\-\. ]{1,128})"', response.text)

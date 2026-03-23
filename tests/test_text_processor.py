@@ -5,7 +5,9 @@ def test_process_success(tmp_path):
     f = tmp_path / "a.txt"
     f.write_text("hello world", encoding="utf-8")
     tp = TextProcessor()
-    assert tp.process(str(f)) == "hello world"
+    result = tp.process(str(f))
+    assert result is not None
+    assert result.markdown == "hello world"
 
 
 def test_process_file_not_found(tmp_path, monkeypatch):

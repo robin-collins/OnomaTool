@@ -1,6 +1,5 @@
 """Shared test fixtures for OnomaTool test suite."""
 
-import os
 import shutil
 import tempfile
 from pathlib import Path

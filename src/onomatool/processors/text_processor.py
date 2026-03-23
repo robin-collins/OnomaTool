@@ -4,6 +4,8 @@ from pathlib import Path
 
 import chardet
 
+from onomatool.models import ProcessingResult
+
 
 class TextProcessor:
     """Processor for text files (.txt, .md, .note, etc.)"""
@@ -22,7 +24,7 @@ class TextProcessor:
             Detected encoding as string
         """
         with open(file_path, "rb") as file:
-            raw_data = file.read()
+            raw_data = file.read(10240)  # Read first 10KB for detection
 
         result = chardet.detect(raw_data)
         encoding = result["encoding"]
@@ -100,7 +102,7 @@ class TextProcessor:
             except FileNotFoundError:
                 pass
 
-    def process(self, file_path: str) -> str | None:
+    def process(self, file_path: str) -> ProcessingResult | None:
         """
         Read and return the content of a text file with proper encoding handling.
 
@@ -108,7 +110,7 @@ class TextProcessor:
             file_path: Path to the text file
 
         Returns:
-            Content of the file as string, or None if file can't be read
+            ProcessingResult with file content, or None if file can't be read
         """
         utf8_file_path = None
         try:
@@ -122,7 +124,12 @@ class TextProcessor:
             if utf8_file_path != file_path:
                 self.cleanup_temp_encoding_file(file_path, utf8_file_path)
 
-            return content
+            ext = os.path.splitext(file_path)[1].lower().lstrip(".")
+            return ProcessingResult(
+                markdown=content,
+                source_path=file_path,
+                file_type=ext or "txt",
+            )
 
         except Exception:
             # Clean up temp file if created

@@ -1,12 +1,32 @@
 """
-Pydantic models for structured LLM responses.
+Pydantic models for structured LLM responses and processing results.
 
 These models define the structure for filename suggestions returned by LLMs,
 ensuring type safety and validation. The models are used with OpenAI's
 structured output feature via client.beta.chat.completions.parse().
 """
 
+from dataclasses import dataclass, field
+
 from pydantic import BaseModel, Field, field_validator
+
+
+@dataclass
+class ProcessingResult:
+    """Unified result from file processors.
+
+    Replaces the mixed return types (str, dict, None) with a single type.
+    """
+
+    markdown: str = ""
+    images: list[str] = field(default_factory=list)
+    tempdir: object | None = None
+    source_path: str = ""
+    file_type: str = ""
+
+    @property
+    def has_images(self) -> bool:
+        return len(self.images) > 0
 
 
 class FilenameSuggestions(BaseModel):

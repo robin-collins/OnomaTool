@@ -209,8 +209,9 @@ class TestUTF8Encoding(unittest.TestCase):
                 test_processor = MarkitdownProcessor(self.config, debug=False)
                 result = test_processor.process(test_file)
 
-                # Should return the processed content (string for non-debug mode)
-                assert result == "Processed content"
+                # Should return ProcessingResult with the processed content
+                assert result is not None
+                assert result.markdown == "Processed content"
 
                 # MarkItDown should have been called with temp UTF-8 file
                 mock_md_instance.convert.assert_called_once()
@@ -221,10 +222,9 @@ class TestUTF8Encoding(unittest.TestCase):
             os.unlink(test_file)
 
     def test_unicode_decode_error_handling(self):
-        """Test handling of UnicodeDecodeError"""
-        # Create a test file with problematic content
+        """Test handling of UnicodeDecodeError falls back to direct text read"""
+        # Create a test file with valid UTF-8 content
         with tempfile.NamedTemporaryFile(mode="wb", suffix=".txt", delete=False) as f:
-            # Write content that might cause issues
             f.write(b"\xe2\x80\x94 em dash in UTF-8")
             test_file = f.name
 
@@ -237,8 +237,9 @@ class TestUTF8Encoding(unittest.TestCase):
 
                 result = self.processor.process(test_file)
 
-                # Should return None and handle the error gracefully
-                assert result is None
+                # Processor falls back to direct UTF-8 read and returns content
+                assert result is not None
+                assert "em dash" in result.markdown
 
         finally:
             os.unlink(test_file)

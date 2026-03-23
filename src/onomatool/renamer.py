@@ -18,8 +18,6 @@ def rename_file(original_path: str, new_name: str) -> None:
     _, ext = os.path.splitext(original_path)
     base_new_name, _ = os.path.splitext(new_name)
     new_name_with_ext = base_new_name + ext
-    os.path.join(directory, new_name_with_ext)
-
     # Get list of existing files in the directory
     existing_files = os.listdir(directory)
 

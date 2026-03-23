@@ -2,9 +2,8 @@ import argparse
 import os
 import sys
 import tempfile
-from pathlib import Path
 
-import toml
+import tomli_w
 
 from onomatool.config import DEFAULT_CONFIG, get_config
 from onomatool.conflict_resolver import resolve_conflict
@@ -13,9 +12,6 @@ from onomatool.file_dispatcher import FileDispatcher
 from onomatool.llm_integration import get_suggestions
 from onomatool.renamer import rename_file
 from onomatool.utils.image_utils import convert_svg_to_png
-
-# Add project root to sys.path
-sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
 def main(args=None):
@@ -100,6 +96,11 @@ def main(args=None):
         if args.interactive and not args.dry_run:
             parser.error("--interactive must be used with --dry-run")
 
+        if args.format:
+            print(
+                "Warning: --format is not yet implemented and will be ignored."
+            )
+
         # Handle verbosity levels
         if args.very_verbose:
             verbose_level = 2  # Very verbose
@@ -143,31 +144,53 @@ def main(args=None):
                         tempdir.cleanup()
                     continue
             result = dispatcher.process(file_path)
-            if not result:
+            if result is None:
                 if tempdir is not None and not args.debug:
                     tempdir.cleanup()
                 continue
             try:
-                if is_svg and png_path:
-                    # Always use PNG for all LLM input for SVGs
-                    all_image_suggestions = []
-                    img_suggestions = get_suggestions(
-                        "",
-                        verbose_level=verbose_level,
-                        file_path=png_path,
-                        config=config,
+                # Preserve tempdir references in debug mode
+                if result.tempdir is not None and args.debug:
+                    debug_tempdirs.append(result.tempdir)
+                    print(
+                        f"[DEBUG] Created tempdir for {result.file_type.upper()}: {result.tempdir.name}"
                     )
-                    if img_suggestions:
-                        all_image_suggestions.append(img_suggestions)
+                    for img_path in result.images:
+                        print(f"[DEBUG] Created image: {img_path}")
+                    markdown_path = os.path.join(
+                        result.tempdir.name, "extracted_content.md"
+                    )
+                    if os.path.exists(markdown_path):
+                        print(f"[DEBUG] Created markdown: {markdown_path}")
+
+                # Determine image paths for LLM analysis
+                if is_svg and png_path:
+                    image_paths = [png_path]
+                elif result.has_images:
+                    image_paths = result.images
+                else:
+                    image_paths = []
+
+                if image_paths:
+                    # Multi-modal path: analyze images then combine with markdown
+                    all_image_suggestions = []
+                    for img_path in image_paths:
+                        img_suggestions = get_suggestions(
+                            "",
+                            verbose_level=verbose_level,
+                            file_path=img_path,
+                            config=config,
+                        )
+                        if img_suggestions:
+                            all_image_suggestions.append(img_suggestions)
                     flat_image_suggestions = [
                         s for sublist in all_image_suggestions for s in sublist
                     ]
+                    ref_image = image_paths[0]
                     md_suggestions = get_suggestions(
-                        result
-                        if isinstance(result, str)
-                        else result.get("markdown", ""),
+                        result.markdown,
                         verbose_level=verbose_level,
-                        file_path=png_path,
+                        file_path=ref_image,
                         config=config,
                     )
                     guidance = "\n".join(flat_image_suggestions)
@@ -178,186 +201,46 @@ def main(args=None):
                         "Now, based on the full document content (markdown below) and the "
                         "above suggestions, generate 3 final file name suggestions that best "
                         "represent the entire file.\n"
-                        f"MARKDOWN:\n{result if isinstance(result, str) else result.get('markdown', '')}"
+                        f"MARKDOWN:\n{result.markdown}"
                     )
                     final_suggestions = get_suggestions(
                         final_prompt,
                         verbose_level=verbose_level,
-                        file_path=png_path,
+                        file_path=ref_image,
                         config=config,
                     )
                     suggestions = (
-                        final_suggestions or md_suggestions or flat_image_suggestions
+                        final_suggestions
+                        or md_suggestions
+                        or flat_image_suggestions
                     )
-                    if suggestions:
-                        new_name = suggestions[0]
-                        directory = os.path.dirname(file_path) or "."
-                        base_new_name, _ = os.path.splitext(new_name)
-                        new_name_with_ext = base_new_name + ext
-                        existing_files = os.listdir(directory)
-                        final_name = resolve_conflict(new_name_with_ext, existing_files)
-                        if args.dry_run:
-                            print(
-                                f"{os.path.basename(file_path)} --dry-run-> {final_name}"
-                            )
-                            planned_renames.append((file_path, new_name))
-                        else:
-                            print(f"{os.path.basename(file_path)} --> {final_name}")
-                            rename_file(file_path, new_name)
                 else:
-                    # Non-SVG logic unchanged
-                    if (
-                        isinstance(result, dict)
-                        and "markdown" in result
-                        and "images" in result
-                    ):
-                        images = result["images"]
-                        pdf_tempdir = result.get("tempdir")
-                        if pdf_tempdir is not None and args.debug:
-                            debug_tempdirs.append(
-                                pdf_tempdir
-                            )  # Prevent GC in debug mode
-                            print(
-                                f"[DEBUG] Created tempdir for PDF/PPTX: {pdf_tempdir.name}"
-                            )
-                            for img_path in images:
-                                print(f"[DEBUG] Created image: {img_path}")
-                            # Check if markdown file was created
-                            markdown_path = os.path.join(
-                                pdf_tempdir.name, "extracted_content.md"
-                            )
-                            if os.path.exists(markdown_path):
-                                print(f"[DEBUG] Created markdown: {markdown_path}")
-                        all_image_suggestions = []
-                        for img_path in images:
-                            img_suggestions = get_suggestions(
-                                "",
-                                verbose_level=verbose_level,
-                                file_path=img_path,
-                                config=config,
-                            )
-                            if img_suggestions:
-                                all_image_suggestions.append(img_suggestions)
-                        flat_image_suggestions = [
-                            s for sublist in all_image_suggestions for s in sublist
-                        ]
-                        md_file_path = images[0] if len(images) > 0 else file_path
-                        md_suggestions = get_suggestions(
-                            result["markdown"],
-                            verbose_level=verbose_level,
-                            file_path=md_file_path,
-                            config=config,
-                        )
-                        guidance = "\n".join(flat_image_suggestions)
-                        final_prompt = (
-                            "You have previously suggested the following file names for each "
-                            "page/slide/image of the file:\n"
-                            f"{guidance}\n"
-                            "Now, based on the full document content (markdown below) and the "
-                            "above suggestions, generate 3 final file name suggestions that best "
-                            "represent the entire file.\n"
-                            f"MARKDOWN:\n{result['markdown']}"
-                        )
-                        final_suggestions = get_suggestions(
-                            final_prompt,
-                            verbose_level=verbose_level,
-                            file_path=md_file_path,
-                            config=config,
-                        )
-                        suggestions = (
-                            final_suggestions
-                            or md_suggestions
-                            or flat_image_suggestions
-                        )
-                        if suggestions:
-                            new_name = suggestions[0]
-                            directory = os.path.dirname(file_path) or "."
-                            _, ext = os.path.splitext(file_path)
-                            base_new_name, _ = os.path.splitext(new_name)
-                            new_name_with_ext = base_new_name + ext
-                            existing_files = os.listdir(directory)
-                            final_name = resolve_conflict(
-                                new_name_with_ext, existing_files
-                            )
-                            if args.dry_run:
-                                print(
-                                    f"{os.path.basename(file_path)} --dry-run-> {final_name}"
-                                )
-                                planned_renames.append((file_path, new_name))
-                            else:
-                                print(f"{os.path.basename(file_path)} --> {final_name}")
-                                rename_file(file_path, new_name)
-                    elif isinstance(result, dict) and "tempdir" in result:
-                        # Handle files with tempdir but no images (text files, Word docs, etc. in debug mode)
-                        file_tempdir = result.get("tempdir")
-                        if file_tempdir is not None and args.debug:
-                            debug_tempdirs.append(
-                                file_tempdir
-                            )  # Prevent GC in debug mode
-                            file_type = (
-                                os.path.splitext(file_path)[1].upper().lstrip(".")
-                            )
-                            print(
-                                f"[DEBUG] Created tempdir for {file_type}: {file_tempdir.name}"
-                            )
-                            # Check if markdown file was created
-                            markdown_path = os.path.join(
-                                file_tempdir.name, "extracted_content.md"
-                            )
-                            if os.path.exists(markdown_path):
-                                print(f"[DEBUG] Created markdown: {markdown_path}")
+                    # Text-only path
+                    suggestions = get_suggestions(
+                        result.markdown,
+                        verbose_level=verbose_level,
+                        file_path=file_path,
+                        config=config,
+                    )
 
-                        content = result.get("markdown", "")
-                        suggestions = get_suggestions(
-                            content,
-                            verbose_level=verbose_level,
-                            file_path=file_path,
-                            config=config,
+                if suggestions:
+                    new_name = suggestions[0]
+                    directory = os.path.dirname(file_path) or "."
+                    _, ext = os.path.splitext(file_path)
+                    base_new_name, _ = os.path.splitext(new_name)
+                    new_name_with_ext = base_new_name + ext
+                    existing_files = os.listdir(directory)
+                    final_name = resolve_conflict(
+                        new_name_with_ext, existing_files
+                    )
+                    if args.dry_run:
+                        print(
+                            f"{os.path.basename(file_path)} --dry-run-> {final_name}"
                         )
-                        if suggestions:
-                            new_name = suggestions[0]
-                            directory = os.path.dirname(file_path) or "."
-                            _, ext = os.path.splitext(file_path)
-                            base_new_name, _ = os.path.splitext(new_name)
-                            new_name_with_ext = base_new_name + ext
-                            existing_files = os.listdir(directory)
-                            final_name = resolve_conflict(
-                                new_name_with_ext, existing_files
-                            )
-                            if args.dry_run:
-                                print(
-                                    f"{os.path.basename(file_path)} --dry-run-> {final_name}"
-                                )
-                                planned_renames.append((file_path, new_name))
-                            else:
-                                print(f"{os.path.basename(file_path)} --> {final_name}")
-                                rename_file(file_path, new_name)
+                        planned_renames.append((file_path, new_name))
                     else:
-                        content = result
-                        suggestions = get_suggestions(
-                            content,
-                            verbose_level=verbose_level,
-                            file_path=file_path,
-                            config=config,
-                        )
-                        if suggestions:
-                            new_name = suggestions[0]  # Use first suggestion in Phase 1
-                            directory = os.path.dirname(file_path) or "."
-                            _, ext = os.path.splitext(file_path)
-                            base_new_name, _ = os.path.splitext(new_name)
-                            new_name_with_ext = base_new_name + ext
-                            existing_files = os.listdir(directory)
-                            final_name = resolve_conflict(
-                                new_name_with_ext, existing_files
-                            )
-                            if args.dry_run:
-                                print(
-                                    f"{os.path.basename(file_path)} --dry-run-> {final_name}"
-                                )
-                                planned_renames.append((file_path, new_name))
-                            else:
-                                print(f"{os.path.basename(file_path)} --> {final_name}")
-                                rename_file(file_path, new_name)
+                        print(f"{os.path.basename(file_path)} --> {final_name}")
+                        rename_file(file_path, new_name)
             finally:
                 # Clean up SVG tempdir if not in debug mode
                 if tempdir is not None:
@@ -366,22 +249,14 @@ def main(args=None):
                     else:
                         tempdir.cleanup()
 
-                # Clean up PDF tempdir if not in debug mode (if it exists in this scope)
-                if "pdf_tempdir" in locals() and pdf_tempdir is not None:
+                # Clean up result tempdir if not in debug mode
+                if result.tempdir is not None:
                     if args.debug:
-                        print(f"[DEBUG] Preserving PDF tempdir: {pdf_tempdir.name}")
-                    else:
-                        pdf_tempdir.cleanup()
-
-                # Clean up file tempdir if not in debug mode (if it exists in this scope)
-                if "file_tempdir" in locals() and file_tempdir is not None:
-                    if args.debug:
-                        file_type = os.path.splitext(file_path)[1].upper().lstrip(".")
                         print(
-                            f"[DEBUG] Preserving {file_type} tempdir: {file_tempdir.name}"
+                            f"[DEBUG] Preserving {result.file_type.upper()} tempdir: {result.tempdir.name}"
                         )
                     else:
-                        file_tempdir.cleanup()
+                        result.tempdir.cleanup()
 
         if args.dry_run and args.interactive and planned_renames:
             confirm = input("\nProceed with these renames? [y/N]: ").strip().lower()
@@ -421,8 +296,8 @@ def save_default_config():
     config["min_filename_words"] = config.get("min_filename_words", 5)
     config["max_filename_words"] = config.get("max_filename_words", 15)
     try:
-        with open(config_path, "w") as f:
-            toml.dump(config, f)
+        with open(config_path, "wb") as f:
+            tomli_w.dump(config, f)
     except Exception as e:
         print(f"Error saving default config: {e}")
         sys.exit(1)
